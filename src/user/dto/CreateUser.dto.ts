@@ -1,11 +1,13 @@
 import {
   IsEmail,
+  IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
-  IsStrongPassword,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { ProviderType } from 'generated/prisma';
 
 export class CreateUserDto {
   @IsString()
@@ -20,9 +22,21 @@ export class CreateUserDto {
   @IsNotEmpty()
   email: string;
 
-  @IsStrongPassword()
+  @IsString()
   @IsNotEmpty()
   @MinLength(6)
   @MaxLength(20)
   password: string;
+
+  @IsOptional()
+  @IsString()
+  profileUrl?: string;
+
+  @IsOptional()
+  @IsEnum(ProviderType)
+  providerType?: ProviderType = ProviderType.LOCAL;
+
+  @IsOptional()
+  @IsString()
+  providerId?: string;
 }

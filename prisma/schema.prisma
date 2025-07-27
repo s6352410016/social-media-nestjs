@@ -17,38 +17,139 @@ datasource db {
 enum Role {
   USER
   ADMIN
+
+  @@map("role")
 }
 
 enum ProviderType {
   LOCAL
   GOOGLE
   GITHUB
+
+  @@map("provider_type")
+}
+
+enum ContentType {
+  POST
+  COMMENT
+  REPLY
+
+  @@map("content_type")
 }
 
 model User {
   id                   Int       @id @default(autoincrement())
   fullname             String
-  username             String    @unique
+  username             String?   @unique
   email                String    @unique
-  passwordHash         String
-  dateOfBirth          DateTime?
-  profileUrl           String?
-  profileBackgroundUrl String?
+  passwordHash         String?   @map("password_hash")
+  dateOfBirth          DateTime? @map("date_of_birth")
+  profileUrl           String?   @map("profile_url")
+  profileBackgroundUrl String?   @map("profile_background_url")
   info                 String?
   role                 Role      @default(USER)
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   provider Provider?
+  otp      Otp?
+  posts    Post[]
+  comments Comment[]
+  likes    Like[]
+
+  @@map("users")
 }
 
 model Provider {
   id           Int          @id @default(autoincrement())
-  providerType ProviderType @default(LOCAL)
-  providerId   String?      @unique
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  providerType ProviderType @default(LOCAL) @map("provider_type")
+  providerId   String?      @unique @map("provider_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
 
-  user   User @relation(fields: [userId], references: [id])
-  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @unique @map("user_id")
+
+  @@map("providers")
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  otpHash   String   @map("otp_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User   @relation(fields: [email], references: [email], onDelete: Cascade)
+  email String @unique
+
+  @@map("otps")
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @map("user_id")
+
+  comments Comment[]
+  likes    Like[]
+
+  @@map("posts")
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId Int  @map("post_id")
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @map("user_id")
+
+  parent   Comment? @relation("CommentToReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId Int?     @map("parent_id")
+
+  replies Comment[] @relation("CommentToReplies")
+  likes   Like[]
+
+  @@map("comments")
+}
+
+model File {
+  id        Int      @id @default(autoincrement())
+  fileName  String   @map("file_name")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contentId   Int         @map("content_id")
+  contentType ContentType @map("content_type")
+
+  @@unique([contentId, contentType, fileName])
+  @@map("files")
+}
+
+model Like {
+  id     Int  @id @default(autoincrement())
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @map("user_id")
+
+  post   Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId Int?  @map("post_id")
+
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId Int?     @map("comment_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@map("likes")
 }

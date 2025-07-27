@@ -37,7 +37,9 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: ['auth/google/callback', 'auth/github/callback'],
+  });
   app.enableCors({
     origin: '*',
     credentials: true,

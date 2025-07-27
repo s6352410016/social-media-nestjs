@@ -1,11 +1,13 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from 'src/user/user.service';
-import { User } from 'generated/prisma';
+import { ProviderType, User } from 'generated/prisma';
 import { CommonResponse } from 'src/utils/swagger/CommonResponse';
 import { Response as ExpressResponse } from 'express';
 import { CreateUserDto } from './dto/create-user.dto';
+import { CreateSocialUserDto, ISocialUserPayload } from 'src/utils/types';
+import { formatString } from 'src/utils/helpers/formatString';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -16,7 +18,7 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  clearCookies(res: ExpressResponse, ...cookieKeys: string[]){
+  clearCookies(res: ExpressResponse, ...cookieKeys: string[]) {
     cookieKeys.forEach((key) => {
       res.clearCookie(key);
     });
@@ -44,7 +46,10 @@ export class AuthService {
     }
   }
 
-  async createJWT(user: Omit<User, 'passwordHash'>, res: ExpressResponse) {
+  async createJWTAndSetCookies(
+    user: Omit<User, 'passwordHash'>,
+    res: ExpressResponse,
+  ) {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         {
@@ -78,7 +83,11 @@ export class AuthService {
     password: string,
   ): Promise<Omit<User, 'passwordHash'> | null> {
     const user = await this.userService.findOne(username);
-    if (user && (await bcrypt.compare(password, user.passwordHash))) {
+    if (
+      user &&
+      user.passwordHash &&
+      (await bcrypt.compare(password, user.passwordHash))
+    ) {
       const { passwordHash, ...result } = user;
       return result;
     }
@@ -90,7 +99,7 @@ export class AuthService {
     user: Omit<User, 'passwordHash'>,
     res: ExpressResponse,
   ): Promise<CommonResponse> {
-    await this.createJWT(user, res);
+    await this.createJWTAndSetCookies(user, res);
     return {
       status: HttpStatus.OK,
       success: true,
@@ -100,12 +109,11 @@ export class AuthService {
 
   async register(createUserDto: CreateUserDto): Promise<CommonResponse> {
     const user = await this.userService.createUser(createUserDto);
-    const { passwordHash, ...result } = user;
     return {
       status: HttpStatus.CREATED,
       success: true,
       message: 'User created successfully',
-      data: result,
+      data: user,
     };
   }
 
@@ -113,7 +121,7 @@ export class AuthService {
     user: Omit<User, 'passwordHash'>,
     res: ExpressResponse,
   ): Promise<CommonResponse> {
-    await this.createJWT(user, res);
+    await this.createJWTAndSetCookies(user, res);
     return {
       status: HttpStatus.OK,
       success: true,
@@ -128,5 +136,58 @@ export class AuthService {
       success: true,
       message: 'Logged out successfully',
     };
+  }
+
+  async socialLogin(
+    user: ISocialUserPayload,
+    res: ExpressResponse,
+    providerType: ProviderType,
+  ): Promise<CommonResponse> {
+    const userExist = await this.userService.findByEmail(user.email);
+
+    // กรณีที่ผู้ใช้มีอยู่แล้ว
+    if (providerType === ProviderType.GOOGLE && userExist) {
+      if (userExist.provider?.providerType !== ProviderType.GOOGLE) {
+        throw new BadRequestException(
+          'Email already registered with a different provider',
+        );
+      }
+
+      await this.createJWTAndSetCookies(userExist, res);
+      return {
+        status: HttpStatus.OK,
+        success: true,
+        message: 'Google login successful',
+      };
+    } else if (providerType === ProviderType.GITHUB && userExist) {
+      if (userExist.provider?.providerType !== ProviderType.GITHUB) {
+        throw new BadRequestException(
+          'Email already registered with a different provider',
+        );
+      }
+
+      await this.createJWTAndSetCookies(userExist, res);
+      return {
+        status: HttpStatus.OK,
+        success: true,
+        message: 'Github login successful',
+      };
+    } else {
+      // กรณีที่ผู้ใช้ยังไม่มีในระบบ
+      const createSocialUserDto: CreateSocialUserDto = {
+        fullname: user.name,
+        email: user.email,
+        providerType,
+        providerId: user.providerId,
+        profileUrl: user.avatar,
+      };
+      const userData = await this.userService.createUser(createSocialUserDto);
+      await this.createJWTAndSetCookies(userData, res);
+      return {
+        status: HttpStatus.OK,
+        success: true,
+        message: `${formatString(providerType)} login successful`,
+      };
+    }
   }
 }

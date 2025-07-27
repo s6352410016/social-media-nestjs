@@ -15,11 +15,13 @@ import {
   Request as ExpressRequest,
   Response as ExpressResponse,
 } from 'express';
-import { User } from 'generated/prisma';
+import { ProviderType, User } from 'generated/prisma';
 import {
   ApiBody,
   ApiCreatedResponse,
   ApiOkResponse,
+  ApiOperation,
+  ApiTemporaryRedirectResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CommonResponse } from 'src/utils/swagger/CommonResponse';
@@ -27,6 +29,9 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { SignInUserDto } from './dto/signin-user.dto';
 import { AtAuthGuard } from './guards/at-auth.guard';
 import { RtAuthGuard } from './guards/rt-auth.guard';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { ISocialUserPayload } from 'src/utils/types';
+import { GithubAuthGuard } from './guards/github-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -36,9 +41,9 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: SignInUserDto })
-  @ApiUnauthorizedResponse({ 
+  @ApiUnauthorizedResponse({
     description: 'Unauthorized',
-    type: CommonResponse, 
+    type: CommonResponse,
   })
   @ApiOkResponse({
     description: 'Login successful',
@@ -48,10 +53,7 @@ export class AuthController {
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
   ): Promise<CommonResponse> {
-    return this.authService.login(
-      req.user as unknown as Omit<User, 'passwordHash'>,
-      res,
-    );
+    return this.authService.login(req.user as Omit<User, 'passwordHash'>, res);
   }
 
   @Post('register')
@@ -65,30 +67,30 @@ export class AuthController {
 
   @UseGuards(AtAuthGuard)
   @Get('profile')
-  @ApiUnauthorizedResponse({ 
+  @ApiUnauthorizedResponse({
     description: 'Unauthorized',
-    type: CommonResponse, 
+    type: CommonResponse,
   })
   @ApiOkResponse({
     description: 'User profile retrieved successfully',
     type: CommonResponse,
   })
   getProfile(@Request() req: ExpressRequest): CommonResponse {
-    const user = req.user as unknown as Omit<User, 'passwordHash'>;
+    const user = req.user as Omit<User, 'passwordHash'>;
     return {
       status: HttpStatus.OK,
       success: true,
       message: 'User profile retrieved successfully',
       data: user,
-    }
+    };
   }
 
   @UseGuards(RtAuthGuard)
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
-  @ApiUnauthorizedResponse({ 
+  @ApiUnauthorizedResponse({
     description: 'Unauthorized',
-    type: CommonResponse, 
+    type: CommonResponse,
   })
   @ApiOkResponse({
     description: 'Tokens refreshed successfully',
@@ -98,7 +100,7 @@ export class AuthController {
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
   ): Promise<CommonResponse> {
-    const user = req.user as unknown as Omit<User, 'passwordHash'>;
+    const user = req.user as Omit<User, 'passwordHash'>;
     return this.authService.refreshToken(user, res);
   }
 
@@ -108,7 +110,61 @@ export class AuthController {
     description: 'Logged out successfully',
     type: CommonResponse,
   })
-  logout(@Response({ passthrough: true }) res: ExpressResponse): CommonResponse {
+  logout(
+    @Response({ passthrough: true }) res: ExpressResponse,
+  ): CommonResponse {
     return this.authService.logout(res);
   }
+
+  @UseGuards(GoogleAuthGuard)
+  @Get('google')
+  @ApiOperation({ summary: 'Redirect to Google Login' })
+  @ApiTemporaryRedirectResponse({
+    description: 'Redirect to Google for authentication',
+  })
+  googleLogin() {}
+
+  @UseGuards(GoogleAuthGuard)
+  @Get('google/callback')
+  @ApiOperation({ summary: 'Google Login Callback' })
+  @ApiOkResponse({
+    description: 'Google login successful',
+    type: CommonResponse,
+  })
+  googleLoginCallback(
+    @Request() req: ExpressRequest,
+    @Response({ passthrough: true }) res: ExpressResponse,
+  ): Promise<CommonResponse> {
+    return this.authService.socialLogin(
+      req.user as ISocialUserPayload,
+      res,
+      ProviderType.GOOGLE,
+    );
+  }
+
+  @UseGuards(GithubAuthGuard)
+  @Get('github')
+  @ApiOperation({ summary: 'Redirect to Github Login' })
+  @ApiTemporaryRedirectResponse({
+    description: 'Redirect to Github for authentication',
+  })
+  githubLogin() {}
+
+  @UseGuards(GithubAuthGuard)
+  @Get('github/callback')
+  @ApiOperation({ summary: 'Github Login Callback' })
+  @ApiOkResponse({
+    description: 'Github login successful',
+    type: CommonResponse,
+  })
+  githubLoginCallback(
+    @Request() req: ExpressRequest,
+    @Response({ passthrough: true }) res: ExpressResponse,
+  ): Promise<CommonResponse> {
+    return this.authService.socialLogin(
+      req.user as ISocialUserPayload,
+      res,
+      ProviderType.GITHUB,
+    );
+  } 
 }
