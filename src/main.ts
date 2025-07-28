@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpStatus, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { CommonResponse } from './utils/swagger/CommonResponse';
+import { CommonResponse } from './utils/swagger/common-response';
 import { HttpExceptionFilter } from './utils/http-exception.filter';
 import * as cookieParser from 'cookie-parser';
 

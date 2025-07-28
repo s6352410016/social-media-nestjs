@@ -7,7 +7,7 @@ import {
 import {
   Response as ExpressResponse,
 } from 'express';
-import { CommonResponse } from './swagger/CommonResponse';
+import { CommonResponse } from './swagger/common-response';
 
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -16,10 +16,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<ExpressResponse>();
     const status = exception.getStatus();
     const message = exception.message;
+    
     response.status(status).json({
       status,
       success: false,
       message,
+      data: exception.getResponse(),
     } satisfies CommonResponse);
   }
 }

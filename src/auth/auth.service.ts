@@ -3,11 +3,11 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from 'src/user/user.service';
 import { ProviderType, User } from 'generated/prisma';
-import { CommonResponse } from 'src/utils/swagger/CommonResponse';
+import { CommonResponse } from 'src/utils/swagger/common-response';
 import { Response as ExpressResponse } from 'express';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSocialUserDto, ISocialUserPayload } from 'src/utils/types';
-import { formatString } from 'src/utils/helpers/formatString';
+import { formatString } from 'src/utils/helpers/format-string';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()

@@ -24,7 +24,7 @@ import {
   ApiTemporaryRedirectResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { CommonResponse } from 'src/utils/swagger/CommonResponse';
+import { CommonResponse } from 'src/utils/swagger/common-response';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SignInUserDto } from './dto/signin-user.dto';
 import { AtAuthGuard } from './guards/at-auth.guard';

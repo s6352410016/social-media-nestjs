@@ -1,4 +1,5 @@
-import { CreateUserDto } from 'src/user/dto/CreateUser.dto';
+import { ContentType } from 'generated/prisma';
+import { CreateUserDto } from 'src/user/dto/create-user.dto';
 
 export interface IJwtPayload {
   id: number;
@@ -26,3 +27,14 @@ export interface IEmailOptions {
   subject: string;
   html: string;
 }  
+
+export interface ICreateFileRecord {
+  fileName: string;
+  contentId: number;
+  contentType: ContentType;
+}
+
+export enum FileType {
+  IMAGE = 'image',
+  VIDEO = 'video',
+}

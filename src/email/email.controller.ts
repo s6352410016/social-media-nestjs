@@ -1,8 +1,8 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { EmailService } from './email.service';
-import { ApiBody, ApiOkResponse } from '@nestjs/swagger';
+import { ApiOkResponse } from '@nestjs/swagger';
 import { SendEmailDto } from './dto/send-email.dto';
-import { CommonResponse } from 'src/utils/swagger/CommonResponse';
+import { CommonResponse } from 'src/utils/swagger/common-response';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @Controller('email')
@@ -11,7 +11,6 @@ export class EmailController {
 
   @Post('send')
   @HttpCode(HttpStatus.OK)
-  @ApiBody({ type: SendEmailDto })
   @ApiOkResponse({
     description: 'Email send successfully',
     type: CommonResponse,
@@ -22,7 +21,6 @@ export class EmailController {
 
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
-  @ApiBody({ type: VerifyOtpDto })
   @ApiOkResponse({
     description: 'OTP verified successfully',
     type: CommonResponse,

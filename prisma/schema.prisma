@@ -95,8 +95,12 @@ model Post {
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId Int  @map("user_id")
 
-  comments Comment[]
-  likes    Like[]
+  parent   Post? @relation("PostToSharePosts", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId Int?  @map("parent_id")
+
+  sharePosts Post[]    @relation("PostToSharePosts")
+  comments   Comment[]
+  likes      Like[]
 
   @@map("posts")
 }

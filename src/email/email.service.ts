@@ -7,8 +7,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SendEmailDto } from './dto/send-email.dto';
-import { hashSecret } from 'src/utils/helpers/hashSecret';
-import { CommonResponse } from 'src/utils/swagger/CommonResponse';
+import { hashSecret } from 'src/utils/helpers/hash-secret';
+import { CommonResponse } from 'src/utils/swagger/common-response';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { IEmailOptions } from 'src/utils/types';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -119,7 +119,7 @@ export class EmailService {
       };
     }
 
-    const isOtpValid = await bcrypt.compare(otp.toString(), otpRecord.otpHash);
+    const isOtpValid = await bcrypt.compare(otp, otpRecord.otpHash);
 
     if (!isOtpValid) {
       return {

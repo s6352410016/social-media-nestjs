@@ -6,11 +6,11 @@ import {
 } from '@nestjs/common';
 import { Provider, ProviderType, User } from 'generated/prisma';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateUserDto } from './dto/CreateUser.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
-import { hashSecret } from 'src/utils/helpers/hashSecret';
-import { CommonResponse } from 'src/utils/swagger/CommonResponse';
-import { ResetPasswordDto } from './dto/ResetPasswordDto';
+import { hashSecret } from 'src/utils/helpers/hash-secret';
+import { CommonResponse } from 'src/utils/swagger/common-response';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CreateSocialUserDto } from 'src/utils/types';
 
 @Injectable()
@@ -142,9 +142,13 @@ export class UserService {
   }
 
   async resetPassword(
-    id: number,
+    userId: number,
     resetPasswordDto: ResetPasswordDto,
   ): Promise<CommonResponse> {
+    if (!userId) {
+      throw new BadRequestException('User id must not be equal to 0');
+    }
+
     const { newPassword, confirmPassword } = resetPasswordDto;
     if (newPassword !== confirmPassword) {
       throw new BadRequestException('Passwords do not match');
@@ -154,7 +158,7 @@ export class UserService {
     try {
       await this.prisma.user.update({
         where: {
-          id,
+          id: userId,
         },
         data: {
           passwordHash,

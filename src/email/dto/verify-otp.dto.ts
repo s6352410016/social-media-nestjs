@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEmail, IsInt, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class VerifyOtpDto {
   @ApiProperty()
@@ -10,8 +9,10 @@ export class VerifyOtpDto {
   email: string;
 
   @ApiProperty()
-  @Type(() => Number)
-  @IsInt()
+  @IsString()
   @IsNotEmpty()
-  otp: number;
+  @Matches(/^\d{6}$/, {
+    message: 'otp must be a 6 digit',
+  })
+  otp: string;
 }
