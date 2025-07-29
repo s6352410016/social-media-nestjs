@@ -35,6 +35,6 @@ export interface ICreateFileRecord {
 }
 
 export enum FileType {
-  IMAGE = 'image',
-  VIDEO = 'video',
+  IMAGE = 'post-image',
+  VIDEO = 'post-video',
 }

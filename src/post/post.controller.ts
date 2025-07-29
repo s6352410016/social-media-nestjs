@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
+  ParseBoolPipe,
   ParseEnumPipe,
   ParseIntPipe,
   Post,
@@ -14,6 +16,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiParam,
 } from '@nestjs/swagger';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -24,10 +27,10 @@ import { FileTypeValidationPipe } from 'src/utils/validation/file-type-validatio
 import { FileType } from 'src/utils/types';
 import { Express } from 'express';
 
-@UseGuards(AtAuthGuard)
+// @UseGuards(AtAuthGuard)
 @Controller('post')
 export class PostController {
-  constructor(private PostService: PostService) {}
+  constructor(private postService: PostService) {}
 
   @Post('create/:userId')
   @ApiCreatedResponse({
@@ -38,7 +41,7 @@ export class PostController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() createPostDto: CreatePostDto,
   ): Promise<CommonResponse> {
-    return this.PostService.createPost(createPostDto, userId);
+    return this.postService.createPost(createPostDto, userId);
   }
 
   @Post('create-with-files/:fileType/:userId')
@@ -54,10 +57,6 @@ export class PostController {
       type: 'object',
       properties: {
         message: { type: 'string' },
-        parentId: {
-          type: 'number',
-          nullable: true,
-        },
         files: {
           type: 'array',
           items: {
@@ -78,11 +77,33 @@ export class PostController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() createPostDto: CreatePostDto,
   ): Promise<CommonResponse> {
-    return this.PostService.createPostWithFiles(
+    return this.postService.createPostWithFiles(
       createPostDto,
       userId,
       files,
-      fileType === 'image' ? 'image' : 'video',
+      fileType,
     );
+  }
+
+  @Post('share/create/:userId/:parentId')
+  @ApiCreatedResponse({
+    description: 'Share post created successfully',
+    type: CommonResponse,
+  })
+  createSharePost(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('parentId', ParseIntPipe) parentId: number,
+    @Body() createPostDto: CreatePostDto,
+  ): Promise<CommonResponse> {
+    return this.postService.createSharePost(userId, parentId, createPostDto);
+  }
+
+  @Get('find')
+  @ApiOkResponse({
+    description: 'Post retrived succussfully',
+    type: CommonResponse,
+  })
+  findPosts(): Promise<CommonResponse> {
+    return this.postService.findPosts();
   }
 }
