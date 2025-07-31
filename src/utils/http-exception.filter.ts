@@ -21,7 +21,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status,
       success: false,
       message,
-      data: exception.getResponse(),
+      data: exception.cause || 'Error something went wrong',
     } satisfies CommonResponse);
   }
 }

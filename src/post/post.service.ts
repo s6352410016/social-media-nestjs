@@ -1,9 +1,11 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommandOutput, S3Client } from '@aws-sdk/client-s3';
 import {
   BadRequestException,
   HttpStatus,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -16,10 +18,13 @@ import { putObjectS3 } from 'src/utils/helpers/put-object-s3';
 import { getObjectS3 } from 'src/utils/helpers/get-object-s3';
 import { genFilesName } from 'src/utils/helpers/gen-files-name';
 import { findFiles } from 'src/utils/helpers/find-files';
-import { FileType } from 'src/utils/types';
-import { Express } from 'express';
 import { getFileNameFromPresignedUrl } from 'src/utils/helpers/get-filename-from-presigned-url';
-import { getDirFromPresignedUrl } from 'src/utils/helpers/get-dir-from-presigned-url';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { deleteObjectS3 } from 'src/utils/helpers/delete-object-s3';
+import { getFileDirFromFile } from 'src/utils/helpers/get-file-dir-from-file';
+import { getFileDirFromPresignedUrl } from 'src/utils/helpers/get-file-dir-from-presigned-url';
+import { FileDir } from 'src/utils/types';
+import { Express } from 'express';
 
 @Injectable()
 export class PostService {
@@ -42,14 +47,14 @@ export class PostService {
   }
 
   async createPost(
-    createPostDto: CreatePostDto,
-    userId: number,
+    createPostDto: CreatePostDto & { userId: number },
+    files: Express.Multer.File[],
   ): Promise<CommonResponse> {
+    const { message, userId } = createPostDto;
     if (!userId) {
       throw new BadRequestException('User id must not be equal to 0');
     }
 
-    const { message } = createPostDto;
     try {
       const post = await this.prismaService.post.create({
         data: {
@@ -76,108 +81,70 @@ export class PostService {
         },
       });
 
-      return {
-        status: HttpStatus.CREATED,
-        success: true,
-        message: 'Created post successfully',
-        data: post,
-      };
-    } catch (error: unknown) {
-      if (
-        error instanceof PrismaClientKnownRequestError &&
-        error.code === 'P2003'
-      ) {
-        throw new BadRequestException('Failed to create post');
+      if (!files || !files.length) {
+        return {
+          status: HttpStatus.CREATED,
+          success: true,
+          message: 'Post created successfully',
+          data: post,
+        };
       }
 
-      throw new InternalServerErrorException(
-        'Unexpected error failed to create post',
-      );
-    }
-  }
+      if (files && files.length) {
+        const newFilesName = genFilesName(files);
+        await Promise.all(
+          newFilesName.map((newFileName) => {
+            const fileDir = getFileDirFromFile(newFileName);
+            return putObjectS3(
+              newFileName,
+              this.configService.get<string>('AWS_BUCKET_NAME')!,
+              fileDir,
+              this.s3,
+            );
+          }),
+        );
 
-  async createPostWithFiles(
-    createPostDto: CreatePostDto,
-    userId: number,
-    files: Express.Multer.File[],
-    fileType: FileType,
-  ): Promise<CommonResponse> {
-    const { message } = createPostDto;
-    if (!userId) {
-      throw new BadRequestException('User id must not be equal to 0');
-    }
+        const filesUrl = await Promise.all(
+          newFilesName.map((newFileName) => {
+            const fileDir = getFileDirFromFile(newFileName);
+            return getObjectS3(
+              newFileName.originalname,
+              this.configService.get<string>('AWS_BUCKET_NAME')!,
+              fileDir,
+              this.s3,
+            );
+          }),
+        );
 
-    try {
-      const post = await this.prismaService.post.create({
-        data: {
-          message,
-          userId,
-        },
-        include: {
-          likes: true,
-          user: {
-            select: {
-              id: true,
-              fullname: true,
-              username: true,
-              email: true,
-              dateOfBirth: true,
-              profileUrl: true,
-              profileBackgroundUrl: true,
-              info: true,
-              role: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          },
-        },
-      });
-
-      const newFilesName = genFilesName(files);
-      await Promise.all(
-        putObjectS3(
-          newFilesName,
-          this.configService.get<string>('AWS_BUCKET_NAME')!,
-          fileType,
-          this.s3,
-        ),
-      );
-
-      const filesUrl = await Promise.all(
-        getObjectS3(
-          newFilesName.map((file) => file.originalname),
-          this.configService.get<string>('AWS_BUCKET_NAME')!,
-          fileType,
-          this.s3,
-        ),
-      );
-
-      const postFileRecords = createFileRecords(
-        filesUrl,
-        post.id,
-        ContentType.POST,
-      );
-      await this.prismaService.file.createMany({
-        data: postFileRecords,
-      });
-
-      return {
-        status: HttpStatus.CREATED,
-        success: true,
-        message: `Post with ${fileType === FileType.IMAGE ? 'images' : 'video'} created successfully`,
-        data: {
-          ...post,
+        const postFileRecords = createFileRecords(
           filesUrl,
-        },
-      };
+          post.id,
+          ContentType.POST,
+        );
+        await this.prismaService.file.createMany({
+          data: postFileRecords,
+        });
+
+        return {
+          status: HttpStatus.CREATED,
+          success: true,
+          message: `Post created successfully`,
+          data: {
+            ...post,
+            filesUrl,
+          },
+        };
+      }
+
+      throw new BadRequestException('Cannot create post');
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
-        throw new BadRequestException(
-          'Cannot create post with iamges something went wrong',
-        );
+        throw new InternalServerErrorException(error.message);
+      } else if (error instanceof BadRequestException) {
+        throw new BadRequestException(error);
       }
 
-      throw new InternalServerErrorException('Unexpected error');
+      throw new InternalServerErrorException(error, 'Unexpected error');
     }
   }
 
@@ -192,6 +159,15 @@ export class PostService {
     }
 
     try {
+      const post = await this.prismaService.post.findUnique({
+        where: {
+          id: parentId,
+        },
+      });
+      if (!post) {
+        throw new NotFoundException(`Parent id ${parentId} not found`);
+      }
+
       const sharePost = await this.prismaService.post.create({
         data: {
           message,
@@ -226,12 +202,12 @@ export class PostService {
       };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
-        throw new BadRequestException(
-          'Cannot create post with iamges something went wrong',
-        );
+        throw new InternalServerErrorException(error.message);
+      } else if (error instanceof NotFoundException) {
+        throw new NotFoundException(error);
       }
 
-      throw new InternalServerErrorException('Unexpected error');
+      throw new InternalServerErrorException(error, 'Unexpected error');
     }
   }
 
@@ -261,27 +237,20 @@ export class PostService {
       const postsWithFiles = await Promise.all(
         posts.map(async (post) => {
           const files = await findFiles(post.id, this.prismaService);
-          const filesUrl = files.map((file) => file.fileName);
-          const filesData = filesUrl.map((fileUrl) => {
-            const fileName = getFileNameFromPresignedUrl(fileUrl);
-            const dirName = getDirFromPresignedUrl(fileUrl);
-            return {
-              fileName,
-              dirName,
-            };
-          });
-          const [filesFromS3Array] = filesData.map((fileData) => {
-            return getObjectS3(
-              filesData.map((file) => file.fileName),
-              this.configService.get<string>('AWS_BUCKET_NAME')!,
-              fileData.dirName === FileType.IMAGE
-                ? FileType.IMAGE
-                : FileType.VIDEO,
-              this.s3,
-            );
-          });
-          const filesFromS3 = await Promise.all(filesFromS3Array);
-          
+          const filesUrl = files.map((file) => file.fileUrl);
+          const filesFromS3 = await Promise.all(
+            filesUrl.map((fileUrl) => {
+              const fileName = getFileNameFromPresignedUrl(fileUrl);
+              const fileDir = getFileDirFromPresignedUrl(fileUrl) as FileDir;
+              return getObjectS3(
+                fileName,
+                this.configService.get<string>('AWS_BUCKET_NAME')!,
+                fileDir,
+                this.s3,
+              );
+            }),
+          );
+
           return {
             ...post,
             filesUrl: filesFromS3,
@@ -297,12 +266,453 @@ export class PostService {
       };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
-        throw new InternalServerErrorException(
-          'Cannot get post with iamges something went wrong',
-        );
+        throw new InternalServerErrorException(error.message);
       }
 
-      throw new InternalServerErrorException('Unexpected error');
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  async findPostById(postId: number): Promise<CommonResponse> {
+    if (!postId) {
+      throw new BadRequestException('Post id must not be equal to 0');
+    }
+
+    try {
+      const post = await this.prismaService.post.findUnique({
+        where: {
+          id: postId,
+        },
+        include: {
+          likes: true,
+          user: {
+            select: {
+              id: true,
+              fullname: true,
+              username: true,
+              email: true,
+              dateOfBirth: true,
+              profileUrl: true,
+              profileBackgroundUrl: true,
+              info: true,
+              role: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      });
+      if (!post) {
+        throw new NotFoundException(`Post id ${postId} not found`);
+      }
+
+      const files = await findFiles(post.id, this.prismaService);
+      const filesUrl = files.map((file) => file.fileUrl);
+      const filesFromS3 = await Promise.all(
+        filesUrl.map((fileUrl) => {
+          const fileName = getFileNameFromPresignedUrl(fileUrl);
+          const fileDir = getFileDirFromPresignedUrl(fileUrl) as FileDir;
+          return getObjectS3(
+            fileName,
+            this.configService.get<string>('AWS_BUCKET_NAME')!,
+            fileDir,
+            this.s3,
+          );
+        }),
+      );
+
+      return {
+        status: HttpStatus.OK,
+        success: true,
+        message: 'Post retrived succussfully',
+        data: {
+          ...post,
+          filesUrl: filesFromS3,
+        },
+      };
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(error.message);
+      } else if (error instanceof NotFoundException) {
+        throw new NotFoundException(error);
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  async findPostByUser(userId: number): Promise<CommonResponse> {
+    if (!userId) {
+      throw new BadRequestException('User id must not be equal to 0');
+    }
+
+    try {
+      const posts = await this.prismaService.post.findMany({
+        where: {
+          userId,
+        },
+        include: {
+          likes: true,
+          user: {
+            select: {
+              id: true,
+              fullname: true,
+              username: true,
+              email: true,
+              dateOfBirth: true,
+              profileUrl: true,
+              profileBackgroundUrl: true,
+              info: true,
+              role: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      });
+      if (!posts || !posts.length) {
+        throw new NotFoundException(`Post by user id ${userId} not found`);
+      }
+
+      const postsWithFiles = await Promise.all(
+        posts.map(async (post) => {
+          const files = await findFiles(post.id, this.prismaService);
+          const filesUrl = files.map((file) => file.fileUrl);
+          const filesFromS3 = await Promise.all(
+            filesUrl.map((fileUrl) => {
+              const fileName = getFileNameFromPresignedUrl(fileUrl);
+              const fileDir = getFileDirFromPresignedUrl(fileUrl) as FileDir;
+              return getObjectS3(
+                fileName,
+                this.configService.get<string>('AWS_BUCKET_NAME')!,
+                fileDir,
+                this.s3,
+              );
+            }),
+          );
+          return {
+            ...post,
+            filesUrl: filesFromS3,
+          };
+        }),
+      );
+
+      return {
+        status: HttpStatus.OK,
+        success: true,
+        message: 'Post retrieved successfully',
+        data: postsWithFiles,
+      };
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(error.message);
+      } else if (error instanceof NotFoundException) {
+        throw new NotFoundException(error);
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  async updatePost(
+    updatePostDto: UpdatePostDto & { postId: number },
+    files?: Express.Multer.File[],
+  ): Promise<CommonResponse> {
+    const { message, postId } = updatePostDto;
+    if (!postId) {
+      throw new BadRequestException('Post id must not be equal to 0');
+    }
+
+    try {
+      const postRecord = await this.prismaService.post.findUnique({
+        where: {
+          id: postId,
+        },
+      });
+      if (!postRecord) {
+        throw new NotFoundException(`Post id ${postId} not found`);
+      }
+
+      const post = await this.prismaService.post.update({
+        where: {
+          id: postId,
+        },
+        data: {
+          message,
+        },
+        include: {
+          likes: true,
+          user: {
+            select: {
+              id: true,
+              fullname: true,
+              username: true,
+              email: true,
+              dateOfBirth: true,
+              profileUrl: true,
+              profileBackgroundUrl: true,
+              info: true,
+              role: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      });
+
+      if (!files || !files.length) {
+        const fileRecords = await this.prismaService.file.findMany({
+          where: {
+            contentId: post.id,
+            contentType: ContentType.POST,
+          },
+        });
+
+        let filesData: { fileName: string; fileDir: FileDir }[] = [];
+        fileRecords.forEach((fileRecord) => {
+          const fileDir = getFileDirFromPresignedUrl(
+            fileRecord.fileUrl,
+          ) as FileDir;
+          const fileName = getFileNameFromPresignedUrl(fileRecord.fileUrl);
+          filesData.push({
+            fileName,
+            fileDir,
+          });
+        });
+        const filesUrl = await Promise.all(
+          filesData.map((fileData) => {
+            return getObjectS3(
+              fileData.fileName,
+              this.configService.get<string>('AWS_BUCKET_NAME')!,
+              fileData.fileDir,
+              this.s3,
+            );
+          }),
+        );
+
+        return {
+          status: HttpStatus.OK,
+          success: true,
+          message: `Update post id ${post.id} successfully`,
+          data: {
+            ...post,
+            filesUrl,
+          },
+        };
+      }
+
+      if (files && files.length) {
+        const postFiles = await findFiles(post.id, this.prismaService);
+
+        if (postFiles && postFiles.length) {
+          await Promise.all(
+            postFiles.map((postFile) => {
+              const fileDir = getFileDirFromPresignedUrl(
+                postFile.fileUrl,
+              ) as FileDir;
+              const fileName = getFileNameFromPresignedUrl(postFile.fileUrl);
+              return deleteObjectS3(
+                fileName,
+                this.configService.get<string>('AWS_BUCKET_NAME')!,
+                fileDir,
+                this.s3,
+              );
+            }),
+          );
+        }
+
+        const newFilesName = genFilesName(files);
+        await Promise.all(
+          newFilesName.map((newFileName) => {
+            const fileDir = getFileDirFromFile(newFileName);
+            return putObjectS3(
+              newFileName,
+              this.configService.get<string>('AWS_BUCKET_NAME')!,
+              fileDir,
+              this.s3,
+            );
+          }),
+        );
+
+        const filesUrl = await Promise.all(
+          newFilesName.map((newFileName) => {
+            const fileDir = getFileDirFromFile(newFileName);
+            return getObjectS3(
+              newFileName.originalname,
+              this.configService.get<string>('AWS_BUCKET_NAME')!,
+              fileDir,
+              this.s3,
+            );
+          }),
+        );
+
+        await Promise.all(
+          postFiles.map(async (postFile) => {
+            return this.prismaService.file.deleteMany({
+              where: {
+                fileUrl: postFile.fileUrl,
+                contentId: post.id,
+                contentType: ContentType.POST,
+              },
+            });
+          }),
+        );
+
+        const createFileRecordsData = createFileRecords(
+          filesUrl,
+          post.id,
+          ContentType.POST,
+        );
+        await this.prismaService.file.createMany({
+          data: createFileRecordsData,
+        });
+
+        return {
+          status: HttpStatus.OK,
+          success: true,
+          message: `Post updated successfully`,
+          data: {
+            ...post,
+            filesUrl,
+          },
+        };
+      }
+
+      throw new UnprocessableEntityException('Error cannot update post');
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(error.message);
+      } else if (error instanceof BadRequestException) {
+        throw new BadRequestException(error);
+      } else if (error instanceof NotFoundException) {
+        throw new NotFoundException(error);
+      } else if (error instanceof UnprocessableEntityException) {
+        throw new UnprocessableEntityException(error);
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  async deletePost(postId: number): Promise<CommonResponse> {
+    if (!postId) {
+      throw new BadRequestException('Post id must not be equal to 0');
+    }
+
+    try {
+      const post = await this.prismaService.post.findUnique({
+        where: {
+          id: postId,
+        },
+      });
+      if (!post) {
+        throw new NotFoundException(`Post id ${postId} not found`);
+      }
+
+      const postFiles = await findFiles(post.id, this.prismaService);
+      await Promise.all([
+        ...postFiles.map((postFile) => {
+          const fileName = getFileNameFromPresignedUrl(postFile.fileUrl);
+          const fileDir = getFileDirFromPresignedUrl(
+            postFile.fileUrl,
+          ) as FileDir;
+          return deleteObjectS3(
+            fileName,
+            this.configService.get<string>('AWS_BUCKET_NAME')!,
+            fileDir,
+            this.s3,
+          );
+        }),
+        ...postFiles.map((postFile) => {
+          return this.prismaService.file.delete({
+            where: {
+              id: postFile.id,
+              contentId: post.id,
+              contentType: ContentType.POST,
+            },
+          });
+        }),
+        this.prismaService.post.delete({
+          where: {
+            id: postId,
+          },
+        }),
+      ]);
+
+      return {
+        status: HttpStatus.OK,
+        success: true,
+        message: 'Post deleted successfully',
+      };
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(error.message);
+      } else if (error instanceof NotFoundException) {
+        throw new NotFoundException(error);
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  async deleteFile(fileId: number): Promise<CommonResponse> {
+    if (!fileId) {
+      throw new BadRequestException('File id must not be equal to 0');
+    }
+
+    try {
+      const file = await this.prismaService.file.findUnique({
+        where: {
+          id: fileId,
+        },
+      });
+      if (!file) {
+        throw new NotFoundException(`File id ${fileId} not found`);
+      }
+
+      function deleteFileFromS3(
+        configService: ConfigService,
+        s3: S3Client,
+      ): Promise<DeleteObjectCommandOutput> {
+        if (file) {
+          const fileName = getFileNameFromPresignedUrl(file.fileUrl);
+          const fileDir = getFileDirFromPresignedUrl(file.fileUrl) as FileDir;
+          return deleteObjectS3(
+            fileName,
+            configService.get<string>('AWS_BUCKET_NAME')!,
+            fileDir,
+            s3,
+          );
+        }
+
+        throw new BadRequestException('File is not empty');
+      }
+
+      await Promise.all([
+        this.prismaService.file.delete({
+          where: {
+            id: fileId,
+            contentType: ContentType.POST,
+          },
+        }),
+        deleteFileFromS3(this.configService, this.s3),
+      ]);
+
+      return {
+        status: HttpStatus.OK,
+        success: true,
+        message: 'File deleted successfully',
+      }
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(error.message);
+      } else if (error instanceof NotFoundException) {
+        throw new NotFoundException(error);
+      }else if(error instanceof BadRequestException){
+        throw new BadRequestException(error);
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
     }
   }
 }

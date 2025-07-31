@@ -7,7 +7,7 @@ export function createFileRecords(
   contentType: ContentType,
 ): ICreateFileRecord[] {
   return newFilesName.map((file) => ({
-    fileName: file,
+    fileUrl: file,
     contentId,
     contentType,
   }));

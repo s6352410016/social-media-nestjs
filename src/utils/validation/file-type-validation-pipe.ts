@@ -4,14 +4,14 @@ import {
   ArgumentMetadata,
   BadRequestException,
 } from '@nestjs/common';
-import { Express } from 'express';
 
 @Injectable()
 export class FileTypeValidationPipe implements PipeTransform {
   transform(value: Express.Multer.File[], metadata: ArgumentMetadata) {
-    if (!value.length) {
-      throw new BadRequestException('File is required');
+    if (!value || !value.length) {
+      return [];
     }
+    
     const allowedMimeTypes = [
       'image/png',
       'image/jpg',

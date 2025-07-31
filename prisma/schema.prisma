@@ -128,14 +128,14 @@ model Comment {
 
 model File {
   id        Int      @id @default(autoincrement())
-  fileName  String   @map("file_name")
+  fileUrl  String   @map("file_name")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   contentId   Int         @map("content_id")
   contentType ContentType @map("content_type")
 
-  @@unique([contentId, contentType, fileName])
+  @@unique([contentId, contentType, fileUrl])
   @@map("files")
 }
 

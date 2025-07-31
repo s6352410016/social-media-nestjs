@@ -29,12 +29,9 @@ export interface IEmailOptions {
 }  
 
 export interface ICreateFileRecord {
-  fileName: string;
+  fileUrl: string;
   contentId: number;
   contentType: ContentType;
 }
 
-export enum FileType {
-  IMAGE = 'post-image',
-  VIDEO = 'post-video',
-}
+export type FileDir = 'post-image' | 'post-video';
