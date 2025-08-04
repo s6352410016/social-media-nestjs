@@ -18,8 +18,12 @@ export class CommonResponse {
       { type: 'number' },
       { type: 'boolean' },
       { type: 'array', items: { type: 'any' } },
-      { type: 'null' }, 
     ],
   })
-  data?: any;
+  data?:
+    | Object
+    | string
+    | number
+    | boolean
+    | Array<Object | string | number | boolean>;
 }
