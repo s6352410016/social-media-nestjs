@@ -51,7 +51,7 @@ export class PostService {
   }
 
   async createPost(
-    createPostDto: CreatePostDto & { userId: number },
+    createPostDto: CreatePostDto & { userId: number; },
     files: Express.Multer.File[],
   ): Promise<CommonResponse> {
     const { message, userId } = createPostDto;
@@ -166,11 +166,9 @@ export class PostService {
   }
 
   async createSharePost(
-    userId: number,
-    parentId: number,
-    createPostDto: CreatePostDto,
+    createPostDto: CreatePostDto & { userId: number; parentId: number; },
   ): Promise<CommonResponse> {
-    const { message } = createPostDto;
+    const { message, userId, parentId } = createPostDto;
     if (!userId) {
       throw new BadRequestException('User id must not be equal to 0');
     }

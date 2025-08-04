@@ -79,7 +79,11 @@ export class PostController {
     @Param('parentId', ParseIntPipe) parentId: number,
     @Body() createPostDto: CreatePostDto,
   ): Promise<CommonResponse> {
-    return this.postService.createSharePost(userId, parentId, createPostDto);
+    return this.postService.createSharePost({
+      ...createPostDto,
+      userId,
+      parentId,
+    });
   }
 
   @Get('find')
