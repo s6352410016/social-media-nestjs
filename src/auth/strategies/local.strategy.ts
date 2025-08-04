@@ -12,7 +12,7 @@ import { validateOrReject } from 'class-validator';
 import {
   handleValidationErrorMsg,
   isValidationErrorArray,
-} from 'src/utils/validation/validation-error';
+} from 'src/utils/validations/validation-error';
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {

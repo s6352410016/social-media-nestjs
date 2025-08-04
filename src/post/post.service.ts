@@ -24,6 +24,9 @@ import { deleteObjectS3 } from 'src/utils/helpers/delete-object-s3';
 import { getFileDirFromFile } from 'src/utils/helpers/get-file-dir-from-file';
 import { getFileDirFromPresignedUrl } from 'src/utils/helpers/get-file-dir-from-presigned-url';
 import { FileDir } from 'src/utils/types';
+import { NotificationService } from 'src/notification/notification.service';
+import { createNotifications } from 'src/utils/helpers/create-notifications';
+import { createNotification } from 'src/utils/helpers/create-notification';
 import { Express } from 'express';
 
 @Injectable()
@@ -34,6 +37,7 @@ export class PostService {
     configServiceParam: ConfigService,
     private configService: ConfigService,
     private prismaService: PrismaService,
+    private notificationService: NotificationService,
   ) {
     this.s3 = new S3Client({
       region: configServiceParam.get<string>('AWS_BUCKET_REGION')!,
@@ -82,6 +86,13 @@ export class PostService {
       });
 
       if (!files || !files.length) {
+        await createNotifications(
+          this.prismaService,
+          this.notificationService,
+          userId,
+          post.id,
+        );
+
         return {
           status: HttpStatus.CREATED,
           success: true,
@@ -124,6 +135,12 @@ export class PostService {
         await this.prismaService.file.createMany({
           data: postFileRecords,
         });
+        await createNotifications(
+          this.prismaService,
+          this.notificationService,
+          userId,
+          post.id,
+        );
 
         return {
           status: HttpStatus.CREATED,
@@ -193,6 +210,11 @@ export class PostService {
           },
         },
       });
+      await createNotification(
+        this.notificationService,
+        userId,
+        post,
+      );
 
       return {
         status: HttpStatus.CREATED,
@@ -702,13 +724,13 @@ export class PostService {
         status: HttpStatus.OK,
         success: true,
         message: 'File deleted successfully',
-      }
+      };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (error instanceof NotFoundException) {
         throw new NotFoundException(error);
-      }else if(error instanceof BadRequestException){
+      } else if (error instanceof BadRequestException) {
         throw new BadRequestException(error);
       }
 

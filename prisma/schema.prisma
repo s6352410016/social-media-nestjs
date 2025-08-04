@@ -37,6 +37,17 @@ enum ContentType {
   @@map("content_type")
 }
 
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  SHARE
+  POST
+  REPLY
+
+  @@map("notification_type")
+}
+
 model User {
   id                   Int       @id @default(autoincrement())
   fullname             String
@@ -51,11 +62,13 @@ model User {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  provider Provider?
-  otp      Otp?
-  posts    Post[]
-  comments Comment[]
-  likes    Like[]
+  provider              Provider?
+  otp                   Otp?
+  posts                 Post[]
+  comments              Comment[]
+  likes                 Like[]
+  senderNotifications   Notification[] @relation("SenderNotifications")
+  receiverNotifications Notification[] @relation("ReceiverNotifications")
 
   @@map("users")
 }
@@ -98,9 +111,10 @@ model Post {
   parent   Post? @relation("PostToSharePosts", fields: [parentId], references: [id], onDelete: Cascade)
   parentId Int?  @map("parent_id")
 
-  sharePosts Post[]    @relation("PostToSharePosts")
-  comments   Comment[]
-  likes      Like[]
+  sharePosts    Post[]         @relation("PostToSharePosts")
+  comments      Comment[]
+  likes         Like[]
+  notifications Notification[]
 
   @@map("posts")
 }
@@ -120,15 +134,16 @@ model Comment {
   parent   Comment? @relation("CommentToReplies", fields: [parentId], references: [id], onDelete: Cascade)
   parentId Int?     @map("parent_id")
 
-  replies Comment[] @relation("CommentToReplies")
-  likes   Like[]
+  replies       Comment[]      @relation("CommentToReplies")
+  likes         Like[]
+  notifications Notification[]
 
   @@map("comments")
 }
 
 model File {
   id        Int      @id @default(autoincrement())
-  fileUrl  String   @map("file_name")
+  fileUrl   String   @map("file_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -156,4 +171,24 @@ model Like {
   @@unique([userId, postId])
   @@unique([userId, commentId])
   @@map("likes")
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  type       NotificationType
+  senderId   Int              @map("sender_id")
+  receiverId Int              @map("receiver_id")
+  postId     Int?             @map("post_id")
+  commentId  Int?             @map("comment_id")
+  message    String?
+  isRead     Boolean          @default(false) @map("is_read")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  sender   User     @relation("SenderNotifications", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User     @relation("ReceiverNotifications", fields: [receiverId], references: [id], onDelete: Cascade)
+  post     Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment  Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }

@@ -23,7 +23,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { CommonResponse } from 'src/utils/swagger/common-response';
 import { AtAuthGuard } from 'src/auth/guards/at-auth.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { FileTypeValidationPipe } from 'src/utils/validation/file-type-validation-pipe';
+import { FileTypeValidationPipe } from 'src/utils/validations/file-type-validation-pipe';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { Express } from 'express';
 
