@@ -1,13 +1,12 @@
-import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from 'src/user/user.service';
-import { ProviderType, User } from 'generated/prisma';
+import { ProviderType, Role, User } from 'generated/prisma';
 import { CommonResponse } from 'src/utils/swagger/common-response';
 import { Response as ExpressResponse } from 'express';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSocialUserDto, ISocialUserPayload } from 'src/utils/types';
-import { formatString } from 'src/utils/helpers/format-string';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -85,6 +84,7 @@ export class AuthService {
     const user = await this.userService.findOne(username);
     if (
       user &&
+      user.provider?.providerType === ProviderType.LOCAL &&
       user.passwordHash &&
       (await bcrypt.compare(password, user.passwordHash))
     ) {
@@ -142,36 +142,28 @@ export class AuthService {
     user: ISocialUserPayload,
     res: ExpressResponse,
     providerType: ProviderType,
-  ): Promise<CommonResponse> {
+  ) {
     const userExist = await this.userService.findByEmail(user.email);
+    const CLIENT_URL = this.configService.get<string>('CLIENT_URL');
+    const CLIENT_REDIRECT_SUCCESS_URL = `${CLIENT_URL}${this.configService.get<string>('CLIENT_REDIRECT_SUCCESS_PATH')}`;
+    const CLIENT_REDIRECT_ERROR_URL = `${CLIENT_URL}${this.configService.get<string>('CLIENT_REDIRECT_ERROR_PATH')}`;
+    const msg = "email already registered with a different provider";
 
     // กรณีที่ผู้ใช้มีอยู่แล้ว
     if (providerType === ProviderType.GOOGLE && userExist) {
       if (userExist.provider?.providerType !== ProviderType.GOOGLE) {
-        throw new BadRequestException(
-          'Email already registered with a different provider',
-        );
+        return res.redirect(`${CLIENT_REDIRECT_ERROR_URL}?message=${encodeURIComponent(msg)}`);
       }
 
       await this.createJWTAndSetCookies(userExist, res);
-      return {
-        status: HttpStatus.OK,
-        success: true,
-        message: 'Google login successful',
-      };
+      return res.redirect(CLIENT_REDIRECT_SUCCESS_URL);
     } else if (providerType === ProviderType.GITHUB && userExist) {
       if (userExist.provider?.providerType !== ProviderType.GITHUB) {
-        throw new BadRequestException(
-          'Email already registered with a different provider',
-        );
+        return res.redirect(`${CLIENT_REDIRECT_ERROR_URL}?message=${encodeURIComponent(msg)}`);
       }
 
       await this.createJWTAndSetCookies(userExist, res);
-      return {
-        status: HttpStatus.OK,
-        success: true,
-        message: 'Github login successful',
-      };
+      return res.redirect(CLIENT_REDIRECT_SUCCESS_URL);
     } else {
       // กรณีที่ผู้ใช้ยังไม่มีในระบบ
       const createSocialUserDto: CreateSocialUserDto = {
@@ -183,11 +175,7 @@ export class AuthService {
       };
       const userData = await this.userService.createUser(createSocialUserDto);
       await this.createJWTAndSetCookies(userData, res);
-      return {
-        status: HttpStatus.OK,
-        success: true,
-        message: `${formatString(providerType)} login successful`,
-      };
+      return res.redirect(CLIENT_REDIRECT_SUCCESS_URL);
     }
   }
 }

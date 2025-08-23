@@ -12,23 +12,37 @@ import { hashSecret } from 'src/utils/helpers/hash-secret';
 import { CommonResponse } from 'src/utils/swagger/common-response';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CreateSocialUserDto } from 'src/utils/types';
+import { formatString } from 'src/utils/helpers/format-string';
 
 @Injectable()
 export class UserService {
   constructor(private prisma: PrismaService) {}
 
-  async findOne(username: string): Promise<User | null> {
+  async findOne(username: string): Promise<(User & { provider: Provider | null }) | null> {
     return await this.prisma.user.findUnique({
       where: {
         username,
+      },
+      select: {
+        id: true,
+        fullname: true,
+        username: true,
+        email: true,
+        passwordHash: true,
+        dateOfBirth: true,
+        profileUrl: true,
+        profileBackgroundUrl: true,
+        info: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+        provider: true,
       },
     });
   }
 
   async createUser(
-    createUserDto:
-      | CreateUserDto
-      | CreateSocialUserDto,
+    createUserDto: CreateUserDto | CreateSocialUserDto,
   ): Promise<
     (Omit<User, 'passwordHash'> & { provider: Provider | null }) | never
   > {
@@ -112,7 +126,7 @@ export class UserService {
         error instanceof PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new BadRequestException('Username or email already exists');
+        throw new BadRequestException(`${formatString(error.meta?.target?.[0])} already exists`);
       }
 
       throw new InternalServerErrorException('Failed to create user');
@@ -136,7 +150,7 @@ export class UserService {
         role: true,
         createdAt: true,
         updatedAt: true,
-        provider: true
+        provider: true,
       },
     });
   }

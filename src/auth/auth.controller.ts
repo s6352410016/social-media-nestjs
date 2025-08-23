@@ -19,6 +19,7 @@ import { ProviderType, User } from 'generated/prisma';
 import {
   ApiBody,
   ApiCreatedResponse,
+  ApiFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTemporaryRedirectResponse,
@@ -127,14 +128,13 @@ export class AuthController {
   @UseGuards(GoogleAuthGuard)
   @Get('google/callback')
   @ApiOperation({ summary: 'Google Login Callback' })
-  @ApiOkResponse({
-    description: 'Google login successful',
-    type: CommonResponse,
+  @ApiFoundResponse({
+    description: 'Redirected after google login',
   })
   googleLoginCallback(
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
-  ): Promise<CommonResponse> {
+  ) {
     return this.authService.socialLogin(
       req.user as ISocialUserPayload,
       res,
@@ -144,7 +144,7 @@ export class AuthController {
 
   @UseGuards(GithubAuthGuard)
   @Get('github')
-  @ApiOperation({ summary: 'Redirect to Github Login' })
+  @ApiOperation({ summary: 'Redirect to github Login' })
   @ApiTemporaryRedirectResponse({
     description: 'Redirect to Github for authentication',
   })
@@ -153,18 +153,17 @@ export class AuthController {
   @UseGuards(GithubAuthGuard)
   @Get('github/callback')
   @ApiOperation({ summary: 'Github Login Callback' })
-  @ApiOkResponse({
-    description: 'Github login successful',
-    type: CommonResponse,
+  @ApiFoundResponse({
+    description: 'Redirected after Github login',
   })
   githubLoginCallback(
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
-  ): Promise<CommonResponse> {
+  ) {
     return this.authService.socialLogin(
       req.user as ISocialUserPayload,
       res,
       ProviderType.GITHUB,
     );
-  } 
+  }
 }

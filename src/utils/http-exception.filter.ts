@@ -16,8 +16,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<ExpressResponse>();
     const status = exception.getStatus();
-    const message = exception.message;
     const exceptionResponse = exception.getResponse();
+    
     let exceptionMessages: string = ''; 
     if(isStringExceptionResponse(exceptionResponse)){
       exceptionMessages = exceptionResponse;
@@ -28,8 +28,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       status,
       success: false,
-      message,
-      data: exception.cause || exceptionMessages || 'Error something went wrong',
+      message: exception.cause || exceptionMessages || 'Error something went wrong',
     } satisfies CommonResponse);
   }
 }
