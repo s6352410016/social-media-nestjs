@@ -12,10 +12,13 @@ import { CommonResponse } from 'src/utils/swagger/common-response';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { IEmailOptions } from 'src/utils/types';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
-import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { Otp } from 'generated/prisma';
+import { JwtService } from '@nestjs/jwt';
+import { Response as ExpressResponse } from 'express';
+import { setCookies } from 'src/utils/helpers/set-cookies';
 import * as nodemailer from 'nodemailer';
 import * as bcrypt from 'bcrypt';
-import { Otp } from 'generated/prisma';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 @Injectable()
 export class EmailService {
@@ -27,6 +30,7 @@ export class EmailService {
   constructor(
     configService: ConfigService,
     private prismaService: PrismaService,
+    private jwtService: JwtService,
   ) {
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -69,7 +73,7 @@ export class EmailService {
         return {
           status: HttpStatus.BAD_REQUEST,
           success: false,
-          message: 'Email already exists',
+          message: 'Otp already exist in your email',
         };
       }
 
@@ -81,7 +85,7 @@ export class EmailService {
     }
   }
 
-  async deleteOtp(email: string): Promise<Otp | never> {
+  async deleteOtp(email: string): Promise<Otp> {
     try {
       return await this.prismaService.otp.delete({
         where: { email },
@@ -98,42 +102,67 @@ export class EmailService {
     }
   }
 
-  async verifyOtp(verifyOtpDto: VerifyOtpDto): Promise<CommonResponse> {
+  async verifyOtp(
+    verifyOtpDto: VerifyOtpDto,
+    res: ExpressResponse,
+  ): Promise<CommonResponse> {
     const { email, otp } = verifyOtpDto;
-    const otpRecord = await this.prismaService.otp.findFirst({
-      where: {
-        email,
-        expiresAt: {
-          gt: new Date(),
+    try {
+      const otpRecord = await this.prismaService.otp.findFirst({
+        where: {
+          email,
+          expiresAt: {
+            gt: new Date(),
+          },
         },
-      },
-    });
+      });
 
-    if (!otpRecord) {
+      if (!otpRecord) {
+        await this.deleteOtp(email);
+
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          success: false,
+          message: 'OTP not found or expired',
+        };
+      }
+
+      const isOtpValid = await bcrypt.compare(otp, otpRecord.otpHash);
+
+      if (!isOtpValid) {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          success: false,
+          message: 'Invalid OTP',
+        };
+      }
+
       await this.deleteOtp(email);
+      const token = await this.jwtService.signAsync({
+        email,
+        otpVerified: true,
+      });
+      setCookies(
+        'reset_password_token',
+        token,
+        res,
+      );
 
       return {
-        status: HttpStatus.BAD_REQUEST,
-        success: false,
-        message: 'OTP not found or expired',
+        status: HttpStatus.OK,
+        success: true,
+        message: 'OTP verified successfully',
       };
-    }
+    } catch (error: unknown) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
 
-    const isOtpValid = await bcrypt.compare(otp, otpRecord.otpHash);
-
-    if (!isOtpValid) {
       return {
-        status: HttpStatus.BAD_REQUEST,
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
         success: false,
-        message: 'Invalid OTP',
+        message: 'Failed to verify otp',
       };
     }
-
-    await this.deleteOtp(email);
-    return {
-      status: HttpStatus.OK,
-      success: true,
-      message: 'OTP verified successfully',
-    };
   }
 }

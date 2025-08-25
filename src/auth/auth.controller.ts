@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Request,
   Response,
@@ -31,12 +32,18 @@ import { SignInUserDto } from './dto/signin-user.dto';
 import { AtAuthGuard } from './guards/at-auth.guard';
 import { RtAuthGuard } from './guards/rt-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { ISocialUserPayload } from 'src/utils/types';
+import { ISocialUserPayload, ResetPasswordPayload } from 'src/utils/types';
 import { GithubAuthGuard } from './guards/github-auth.guard';
+import { ResetPasswordAuthGuard } from './guards/reset-password-auth.guard';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UserService } from 'src/user/user.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private userService: UserService,
+  ) {}
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
@@ -164,6 +171,30 @@ export class AuthController {
       req.user as ISocialUserPayload,
       res,
       ProviderType.GITHUB,
+    );
+  }
+
+  @UseGuards(ResetPasswordAuthGuard)
+  @Patch('user/reset-password')
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: CommonResponse,
+  })
+  @ApiOkResponse({
+    description: 'Reset password successfully',
+    type: CommonResponse,
+  })
+  resetPassword(
+    @Request() req: ExpressRequest,
+    @Response({ passthrough: true }) res: ExpressResponse,
+    @Body() resetPasswordDto: ResetPasswordDto,
+  ): Promise<CommonResponse> {
+    return this.userService.resetPassword(
+      {
+        ...resetPasswordDto,
+        email: (req.user as ResetPasswordPayload).email,
+      },
+      res,
     );
   }
 }

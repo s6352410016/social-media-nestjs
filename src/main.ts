@@ -41,7 +41,7 @@ async function bootstrap() {
     exclude: ['auth/google/callback', 'auth/github/callback'],
   });
   app.enableCors({
-    origin: '*',
+    origin: 'http://localhost:3000',
     credentials: true,
   });
   app.use(cookieParser());

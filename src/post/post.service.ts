@@ -158,7 +158,7 @@ export class PostService {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (error instanceof BadRequestException) {
-        throw new BadRequestException(error);
+        throw error;
       }
 
       throw new InternalServerErrorException(error, 'Unexpected error');
@@ -224,7 +224,7 @@ export class PostService {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (error instanceof NotFoundException) {
-        throw new NotFoundException(error);
+        throw error;
       }
 
       throw new InternalServerErrorException(error, 'Unexpected error');
@@ -354,7 +354,7 @@ export class PostService {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (error instanceof NotFoundException) {
-        throw new NotFoundException(error);
+        throw error;
       }
 
       throw new InternalServerErrorException(error, 'Unexpected error');
@@ -427,7 +427,7 @@ export class PostService {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (error instanceof NotFoundException) {
-        throw new NotFoundException(error);
+        throw error;
       }
 
       throw new InternalServerErrorException(error, 'Unexpected error');
@@ -603,11 +603,11 @@ export class PostService {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (error instanceof BadRequestException) {
-        throw new BadRequestException(error);
+        throw error;
       } else if (error instanceof NotFoundException) {
-        throw new NotFoundException(error);
+        throw error;
       } else if (error instanceof UnprocessableEntityException) {
-        throw new UnprocessableEntityException(error);
+        throw error;
       }
 
       throw new InternalServerErrorException(error, 'Unexpected error');
@@ -668,7 +668,7 @@ export class PostService {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (error instanceof NotFoundException) {
-        throw new NotFoundException(error);
+        throw error;
       }
 
       throw new InternalServerErrorException(error, 'Unexpected error');
@@ -727,9 +727,9 @@ export class PostService {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (error instanceof NotFoundException) {
-        throw new NotFoundException(error);
+        throw error;
       } else if (error instanceof BadRequestException) {
-        throw new BadRequestException(error);
+        throw error;
       }
 
       throw new InternalServerErrorException(error, 'Unexpected error');

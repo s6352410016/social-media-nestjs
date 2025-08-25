@@ -7,6 +7,13 @@ export interface IJwtPayload {
   exp: number;
 }
 
+export interface ResetPasswordPayload {
+  email: string;
+  otpVerified: boolean;
+  iat: number;
+  exp: number;
+}
+
 export interface ISocialUserPayload {
   provider: string;
   providerId: string;

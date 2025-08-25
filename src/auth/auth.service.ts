@@ -2,11 +2,12 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from 'src/user/user.service';
-import { ProviderType, Role, User } from 'generated/prisma';
+import { ProviderType, User } from 'generated/prisma';
 import { CommonResponse } from 'src/utils/swagger/common-response';
 import { Response as ExpressResponse } from 'express';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSocialUserDto, ISocialUserPayload } from 'src/utils/types';
+import { setCookies } from 'src/utils/helpers/set-cookies';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -21,28 +22,6 @@ export class AuthService {
     cookieKeys.forEach((key) => {
       res.clearCookie(key);
     });
-  }
-
-  setCookies(
-    key: string[] | string,
-    value: string[] | string,
-    res: ExpressResponse,
-  ) {
-    if (Array.isArray(key) && Array.isArray(value)) {
-      key.forEach((k, index) => {
-        res.cookie(k, value[index], {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none',
-        });
-      });
-    } else if (typeof key === 'string' && typeof value === 'string') {
-      res.cookie(key, value, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-      });
-    }
   }
 
   async createJWTAndSetCookies(
@@ -70,7 +49,7 @@ export class AuthService {
       ),
     ]);
 
-    this.setCookies(
+    setCookies(
       ['access_token', 'refresh_token'],
       [accessToken, refreshToken],
       res,

@@ -13,6 +13,7 @@ import { CommonResponse } from 'src/utils/swagger/common-response';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CreateSocialUserDto } from 'src/utils/types';
 import { formatString } from 'src/utils/helpers/format-string';
+import { Response as ExpressResponse } from 'express';
 
 @Injectable()
 export class UserService {
@@ -156,15 +157,11 @@ export class UserService {
   }
 
   async resetPassword(
-    userId: number,
     resetPasswordDto: ResetPasswordDto,
+    res: ExpressResponse,
   ): Promise<CommonResponse> {
-    if (!userId) {
-      throw new BadRequestException('User id must not be equal to 0');
-    }
-
-    const { newPassword, confirmPassword } = resetPasswordDto;
-    if (newPassword !== confirmPassword) {
+    const { password, confirmPassword, email } = resetPasswordDto;
+    if (password !== confirmPassword) {
       throw new BadRequestException('Passwords do not match');
     }
 
@@ -172,12 +169,13 @@ export class UserService {
     try {
       await this.prisma.user.update({
         where: {
-          id: userId,
+          email,
         },
         data: {
           passwordHash,
         },
       });
+      res.clearCookie('reset_password_token');
       return {
         status: 200,
         success: true,
@@ -189,6 +187,8 @@ export class UserService {
         error.code === 'P2025'
       ) {
         throw new NotFoundException('User not found');
+      }else if (error instanceof BadRequestException) {
+        throw error;
       }
 
       throw new InternalServerErrorException('Failed to reset password');

@@ -9,9 +9,14 @@ import { AtStrategy } from './strategies/at.strategy';
 import { RtStrategy } from './strategies/rt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GithubStrategy } from './strategies/github.strategy';
+import { ResetPasswordStrategy } from './strategies/reset-password.strategy';
 
 @Module({
-  imports: [UserModule, PassportModule, JwtModule.register({})],
+  imports: [
+    UserModule, 
+    PassportModule, 
+    JwtModule.register({})
+  ],
   controllers: [AuthController],
   providers: [
     AuthService,
@@ -20,6 +25,7 @@ import { GithubStrategy } from './strategies/github.strategy';
     RtStrategy,
     GoogleStrategy,
     GithubStrategy,
+    ResetPasswordStrategy,
   ],
 })
 export class AuthModule {}
