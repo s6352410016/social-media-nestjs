@@ -18,7 +18,11 @@ import { EmailModule } from 'src/email/email.module';
     EmailModule,
     UserModule, 
     PassportModule, 
-    JwtModule.register({}),
+    JwtModule.register({
+      signOptions: {
+        expiresIn: '5m',
+      },
+    }),
   ],
   controllers: [AuthController],
   providers: [

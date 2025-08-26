@@ -8,6 +8,7 @@ import { Response as ExpressResponse } from 'express';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSocialUserDto, ISocialUserPayload } from 'src/utils/types';
 import { setCookies } from 'src/utils/helpers/set-cookies';
+import { createJwt } from 'src/utils/helpers/create-jwt';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -32,6 +33,7 @@ export class AuthService {
       this.jwtService.signAsync(
         {
           id: user.id,
+          authVerified: true,
         },
         {
           secret: this.configService.get<string>('AT_SECRET'),
@@ -126,19 +128,37 @@ export class AuthService {
     const CLIENT_URL = this.configService.get<string>('CLIENT_URL');
     const CLIENT_REDIRECT_SUCCESS_URL = `${CLIENT_URL}${this.configService.get<string>('CLIENT_REDIRECT_SUCCESS_PATH')}`;
     const CLIENT_REDIRECT_ERROR_URL = `${CLIENT_URL}${this.configService.get<string>('CLIENT_REDIRECT_ERROR_PATH')}`;
-    const msg = "email already registered with a different provider";
+    const msg = 'email already registered with a different provider';
 
     // กรณีที่ผู้ใช้มีอยู่แล้ว
     if (providerType === ProviderType.GOOGLE && userExist) {
       if (userExist.provider?.providerType !== ProviderType.GOOGLE) {
-        return res.redirect(`${CLIENT_REDIRECT_ERROR_URL}?message=${encodeURIComponent(msg)}`);
+        const token = await createJwt(
+          {
+            socialAuthVerified: true,
+          },
+          this.configService.get<string>('SOCIAL_LOGIN_ERROR_SECRET')!,
+          this.jwtService,
+        );
+        return res.redirect(
+          `${CLIENT_REDIRECT_ERROR_URL}?message=${encodeURIComponent(msg)}&error_token=${token}`,
+        );
       }
 
       await this.createJWTAndSetCookies(userExist, res);
       return res.redirect(CLIENT_REDIRECT_SUCCESS_URL);
     } else if (providerType === ProviderType.GITHUB && userExist) {
       if (userExist.provider?.providerType !== ProviderType.GITHUB) {
-        return res.redirect(`${CLIENT_REDIRECT_ERROR_URL}?message=${encodeURIComponent(msg)}`);
+        const token = await createJwt(
+          {
+            socialAuthVerified: true,
+          },
+          this.configService.get<string>('SOCIAL_LOGIN_ERROR_SECRET')!,
+          this.jwtService,
+        );
+        return res.redirect(
+          `${CLIENT_REDIRECT_ERROR_URL}?message=${encodeURIComponent(msg)}&error_token=${token}`,
+        );
       }
 
       await this.createJWTAndSetCookies(userExist, res);

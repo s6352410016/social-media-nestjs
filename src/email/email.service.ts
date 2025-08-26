@@ -16,6 +16,7 @@ import { Otp } from 'generated/prisma';
 import { JwtService } from '@nestjs/jwt';
 import { Response as ExpressResponse } from 'express';
 import { setCookies } from 'src/utils/helpers/set-cookies';
+import { createJwt } from 'src/utils/helpers/create-jwt';
 import * as nodemailer from 'nodemailer';
 import * as bcrypt from 'bcrypt';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
@@ -42,12 +43,6 @@ export class EmailService {
     });
   }
 
-  createJwt(payload: Object, secret: string): Promise<string>{
-    return this.jwtService.signAsync(payload, {
-      secret,
-    });
-  }
-
   async sendEmail(
     sendEmailDto: SendEmailDto,
     res: ExpressResponse,
@@ -71,12 +66,13 @@ export class EmailService {
                   <p>This code <b>expires in 10 minutes</b>.</p>`,
       };
       const result = await this.transporter.sendMail(mailOptions);
-      const token = await this.createJwt(
+      const token = await createJwt(
         {
           email,
           sendEmailVerified: true,
         },
         this.configServiceP.get<string>('FORGOT_PASSWORD_SECRET')!,
+        this.jwtService,
       );
       setCookies('forgot_password_token', token, res);
       return {
@@ -157,12 +153,13 @@ export class EmailService {
       }
 
       await this.deleteOtp(email);
-      const token = await this.createJwt(
+      const token = await createJwt(
         {
           email,
           otpVerified: true,
         },
         this.configServiceP.get<string>('RESET_PASSWORD_SECRET')!,
+        this.jwtService,
       );
       setCookies('reset_password_token', token, res);
       res.clearCookie('forgot_password_token');
