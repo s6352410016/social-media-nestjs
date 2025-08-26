@@ -1,18 +1,10 @@
 import { ContentType } from 'generated/prisma';
 import { CreateUserDto } from 'src/user/dto/create-user.dto';
 
-export interface IJwtPayload {
-  id: number;
+export type JwtPayload<T extends object = {}> = {
   iat: number;
   exp: number;
-}
-
-export interface ResetPasswordPayload {
-  email: string;
-  otpVerified: boolean;
-  iat: number;
-  exp: number;
-}
+} & T;
 
 export interface ISocialUserPayload {
   provider: string;

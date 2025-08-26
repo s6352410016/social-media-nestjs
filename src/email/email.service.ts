@@ -31,6 +31,7 @@ export class EmailService {
     configService: ConfigService,
     private prismaService: PrismaService,
     private jwtService: JwtService,
+    private configServiceP: ConfigService,
   ) {
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -41,25 +42,43 @@ export class EmailService {
     });
   }
 
-  async sendEmail(sendEmailDto: SendEmailDto): Promise<CommonResponse> {
+  createJwt(payload: Object, secret: string): Promise<string>{
+    return this.jwtService.signAsync(payload, {
+      secret,
+    });
+  }
+
+  async sendEmail(
+    sendEmailDto: SendEmailDto,
+    res: ExpressResponse,
+  ): Promise<CommonResponse> {
+    const { email } = sendEmailDto;
     const otp = `${Math.floor(Math.random() * 900000 + 100000)}`; // สร้าง OTP 6 หลัก
     const otpHash = await hashSecret(otp);
     try {
       await this.prismaService.otp.create({
         data: {
           otpHash,
-          email: sendEmailDto.email,
+          email,
           expiresAt: new Date(Date.now() + 600000), // กำหนดให้ OTP หมดอายุใน 10 นาที
         },
       });
       const mailOptions: IEmailOptions = {
         from: '"bynsocial" <bynsocial@email.com>',
-        to: sendEmailDto.email,
+        to: email,
         subject: 'Verify Your Email',
         html: `<p>Enter <b>${otp}</b> in the page to verify your email address and complete to reset password process.</p>
                   <p>This code <b>expires in 10 minutes</b>.</p>`,
       };
       const result = await this.transporter.sendMail(mailOptions);
+      const token = await this.createJwt(
+        {
+          email,
+          sendEmailVerified: true,
+        },
+        this.configServiceP.get<string>('FORGOT_PASSWORD_SECRET')!,
+      );
+      setCookies('forgot_password_token', token, res);
       return {
         status: HttpStatus.OK,
         success: true,
@@ -138,15 +157,15 @@ export class EmailService {
       }
 
       await this.deleteOtp(email);
-      const token = await this.jwtService.signAsync({
-        email,
-        otpVerified: true,
-      });
-      setCookies(
-        'reset_password_token',
-        token,
-        res,
+      const token = await this.createJwt(
+        {
+          email,
+          otpVerified: true,
+        },
+        this.configServiceP.get<string>('RESET_PASSWORD_SECRET')!,
       );
+      setCookies('reset_password_token', token, res);
+      res.clearCookie('forgot_password_token');
 
       return {
         status: HttpStatus.OK,

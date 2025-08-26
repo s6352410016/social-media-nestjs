@@ -32,17 +32,21 @@ import { SignInUserDto } from './dto/signin-user.dto';
 import { AtAuthGuard } from './guards/at-auth.guard';
 import { RtAuthGuard } from './guards/rt-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { ISocialUserPayload, ResetPasswordPayload } from 'src/utils/types';
+import { ISocialUserPayload, JwtPayload } from 'src/utils/types';
 import { GithubAuthGuard } from './guards/github-auth.guard';
 import { ResetPasswordAuthGuard } from './guards/reset-password-auth.guard';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UserService } from 'src/user/user.service';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { EmailService } from 'src/email/email.service';
+import { ForgotPasswordAuthGuard } from './guards/forgot-password-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private userService: UserService,
+    private emailService: EmailService,
   ) {}
 
   @UseGuards(LocalAuthGuard)
@@ -192,7 +196,37 @@ export class AuthController {
     return this.userService.resetPassword(
       {
         ...resetPasswordDto,
-        email: (req.user as ResetPasswordPayload).email,
+        email: (
+          req.user as JwtPayload<{
+            email: string;
+          }>
+        ).email,
+      },
+      res,
+    );
+  }
+
+  @UseGuards(ForgotPasswordAuthGuard)
+  @Post('email/verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    description: 'OTP verified successfully',
+    type: CommonResponse,
+  })
+  verifyOtp(
+    @Body() verifyOtpDto: VerifyOtpDto,
+    @Request() req: ExpressRequest,
+    @Response({ passthrough: true })
+    res: ExpressResponse,
+  ): Promise<CommonResponse> {
+    return this.emailService.verifyOtp(
+      {
+        ...verifyOtpDto,
+        email: (
+          req.user as JwtPayload<{
+            email: string;
+          }>
+        ).email,
       },
       res,
     );

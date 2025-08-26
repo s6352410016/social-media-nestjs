@@ -10,12 +10,15 @@ import { RtStrategy } from './strategies/rt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GithubStrategy } from './strategies/github.strategy';
 import { ResetPasswordStrategy } from './strategies/reset-password.strategy';
+import { ForgotPasswordStrategy } from './strategies/forgot-password.strategy';
+import { EmailModule } from 'src/email/email.module';
 
 @Module({
   imports: [
+    EmailModule,
     UserModule, 
     PassportModule, 
-    JwtModule.register({})
+    JwtModule.register({}),
   ],
   controllers: [AuthController],
   providers: [
@@ -26,6 +29,7 @@ import { ResetPasswordStrategy } from './strategies/reset-password.strategy';
     GoogleStrategy,
     GithubStrategy,
     ResetPasswordStrategy,
+    ForgotPasswordStrategy,
   ],
 })
 export class AuthModule {}

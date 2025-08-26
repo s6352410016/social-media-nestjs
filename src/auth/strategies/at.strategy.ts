@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request as ExpressRequest } from 'express';
-import { IJwtPayload } from 'src/utils/types';
+import { JwtPayload } from 'src/utils/types';
 import { UserService } from 'src/user/user.service';
 import { User } from 'generated/prisma';
 
@@ -25,7 +25,7 @@ export class AtStrategy extends PassportStrategy(Strategy, 'access-token') {
     });
   }
 
-  validate(payload: IJwtPayload): Promise<Omit<User, 'passwordHash'> | null> {
+  validate(payload: JwtPayload<{ id: number }>): Promise<Omit<User, 'passwordHash'> | null> {
     return this.userService.findById(payload.id);
   }
 }

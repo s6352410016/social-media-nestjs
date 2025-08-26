@@ -6,20 +6,20 @@ import { Request as ExpressRequest } from 'express';
 import { JwtPayload } from 'src/utils/types';
 
 @Injectable()
-export class ResetPasswordStrategy extends PassportStrategy(
+export class ForgotPasswordStrategy extends PassportStrategy(
   Strategy,
-  'reset-password-jwt',
+  'forgot-password-jwt',
 ) {
   constructor(configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: ExpressRequest) => {
-          const token = req?.cookies?.['reset_password_token'];
+          const token = req?.cookies?.['forgot_password_token'];
           return token;
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('RESET_PASSWORD_SECRET')!,
+      secretOrKey: configService.get<string>('FORGOT_PASSWORD_SECRET')!,
     });
   }
 
