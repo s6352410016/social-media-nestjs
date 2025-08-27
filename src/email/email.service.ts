@@ -118,7 +118,7 @@ export class EmailService {
   }
 
   async verifyOtp(
-    verifyOtpDto: VerifyOtpDto,
+    verifyOtpDto: VerifyOtpDto & { email: string },
     res: ExpressResponse,
   ): Promise<CommonResponse> {
     const { email, otp } = verifyOtpDto;

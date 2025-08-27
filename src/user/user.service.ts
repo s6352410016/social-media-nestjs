@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -19,7 +20,9 @@ import { Response as ExpressResponse } from 'express';
 export class UserService {
   constructor(private prisma: PrismaService) {}
 
-  async findOne(username: string): Promise<(User & { provider: Provider | null }) | null> {
+  async findOne(
+    username: string,
+  ): Promise<(User & { provider: Provider | null }) | null> {
     return await this.prisma.user.findUnique({
       where: {
         username,
@@ -127,7 +130,9 @@ export class UserService {
         error instanceof PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new BadRequestException(`${formatString(error.meta?.target?.[0])} already exists`);
+        throw new BadRequestException(
+          `${formatString(error.meta?.target?.[0])} already exists`,
+        );
       }
 
       throw new InternalServerErrorException('Failed to create user');
@@ -157,7 +162,7 @@ export class UserService {
   }
 
   async resetPassword(
-    resetPasswordDto: ResetPasswordDto,
+    resetPasswordDto: ResetPasswordDto & { email: string },
     res: ExpressResponse,
   ): Promise<CommonResponse> {
     const { password, confirmPassword, email } = resetPasswordDto;
@@ -187,7 +192,7 @@ export class UserService {
         error.code === 'P2025'
       ) {
         throw new NotFoundException('User not found');
-      }else if (error instanceof BadRequestException) {
+      } else if (error instanceof BadRequestException) {
         throw error;
       }
 
@@ -219,5 +224,42 @@ export class UserService {
         provider: true,
       },
     });
+  }
+
+  async findByFullname(
+    currentId: number,
+    query: string,
+  ): Promise<CommonResponse> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        fullname: {
+          contains: query,
+          mode: 'insensitive',
+        },
+        id: {
+          not: currentId,
+        },
+      },
+      select: {
+        id: true,
+        fullname: true,
+        username: true,
+        email: true,
+        dateOfBirth: true,
+        profileUrl: true,
+        profileBackgroundUrl: true,
+        info: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+        provider: true,
+      },
+    });
+    return {
+      status: HttpStatus.OK,
+      success: true,
+      message: 'Users retreived successfully',
+      data: users,
+    };
   }
 }
