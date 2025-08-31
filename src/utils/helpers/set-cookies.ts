@@ -11,6 +11,7 @@ export function setCookies(
         httpOnly: true,
         secure: true,
         sameSite: 'none',
+        maxAge: 1000 * 60 * 60,
       });
     });
   } else if (typeof key === 'string' && typeof value === 'string') {
@@ -18,6 +19,7 @@ export function setCookies(
       httpOnly: true,
       secure: true,
       sameSite: 'none',
+      maxAge: 1000 * 60 * 60,
     });
   }
 }

@@ -109,6 +109,7 @@ export class AuthController {
     return this.authService.refreshToken(user, res);
   }
 
+  @UseGuards(AtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({
