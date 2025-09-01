@@ -174,7 +174,8 @@ model Like {
 }
 
 model Notification {
-  id         String           @id @default(uuid())
+  // id         String           @id @default(uuid())
+  id     Int  @id @default(autoincrement())
   type       NotificationType
   senderId   Int              @map("sender_id")
   receiverId Int              @map("receiver_id")

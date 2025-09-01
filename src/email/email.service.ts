@@ -1,5 +1,4 @@
 import {
-  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -8,7 +7,6 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SendEmailDto } from './dto/send-email.dto';
 import { hashSecret } from 'src/utils/helpers/hash-secret';
-import { CommonResponse } from 'src/utils/swagger/common-response';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { IEmailOptions } from 'src/utils/types';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -46,7 +44,7 @@ export class EmailService {
   async sendEmail(
     sendEmailDto: SendEmailDto,
     res: ExpressResponse,
-  ): Promise<CommonResponse> {
+  ) {
     const { email } = sendEmailDto;
     const otp = `${Math.floor(Math.random() * 900000 + 100000)}`; // สร้าง OTP 6 หลัก
     const otpHash = await hashSecret(otp);
@@ -76,8 +74,6 @@ export class EmailService {
       );
       setCookies('forgot_password_token', token, res);
       return {
-        status: HttpStatus.OK,
-        success: true,
         message: `Email send to ${result.accepted[0]} successfully`,
       };
     } catch (error: unknown) {
@@ -86,15 +82,11 @@ export class EmailService {
         error.code === 'P2002'
       ) {
         return {
-          status: HttpStatus.BAD_REQUEST,
-          success: false,
           message: 'Otp already exist in your email',
         };
       }
 
       return {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        success: false,
         message: 'Failed to send email',
       };
     }
@@ -119,8 +111,7 @@ export class EmailService {
 
   async verifyOtp(
     verifyOtpDto: VerifyOtpDto & { email: string },
-    res: ExpressResponse,
-  ): Promise<CommonResponse> {
+  ) {
     const { email, otp } = verifyOtpDto;
     try {
       const otpRecord = await this.prismaService.otp.findFirst({
@@ -136,9 +127,8 @@ export class EmailService {
         await this.deleteOtp(email);
 
         return {
-          status: HttpStatus.BAD_REQUEST,
-          success: false,
           message: 'OTP not found or expired',
+          token: null,
         };
       }
 
@@ -146,9 +136,8 @@ export class EmailService {
 
       if (!isOtpValid) {
         return {
-          status: HttpStatus.BAD_REQUEST,
-          success: false,
           message: 'Invalid OTP',
+          token: null,
         };
       }
 
@@ -161,23 +150,19 @@ export class EmailService {
         this.configServiceP.get<string>('RESET_PASSWORD_SECRET')!,
         this.jwtService,
       );
-      setCookies('reset_password_token', token, res);
-      res.clearCookie('forgot_password_token');
 
       return {
-        status: HttpStatus.OK,
-        success: true,
-        message: 'OTP verified successfully',
-      };
+        message: null,
+        token,
+      }
     } catch (error: unknown) {
       if (error instanceof NotFoundException) {
         throw error;
       }
 
       return {
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        success: false,
         message: 'Failed to verify otp',
+        token: null,
       };
     }
   }

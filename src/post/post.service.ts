@@ -1,7 +1,6 @@
 import { DeleteObjectCommandOutput, S3Client } from '@aws-sdk/client-s3';
 import {
   BadRequestException,
-  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -11,8 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
-import { CommonResponse } from 'src/utils/swagger/common-response';
-import { ContentType } from 'generated/prisma';
+import { ContentType, Like, Post, User } from 'generated/prisma';
 import { createFileRecords } from 'src/utils/helpers/create-file-records';
 import { putObjectS3 } from 'src/utils/helpers/put-object-s3';
 import { getObjectS3 } from 'src/utils/helpers/get-object-s3';
@@ -51,9 +49,13 @@ export class PostService {
   }
 
   async createPost(
-    createPostDto: CreatePostDto & { userId: number; },
+    createPostDto: CreatePostDto & { userId: number },
     files: Express.Multer.File[],
-  ): Promise<CommonResponse> {
+  ): Promise<
+    Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+      filesUrl?: string[];
+    }
+  > {
     const { message, userId } = createPostDto;
     if (!userId) {
       throw new BadRequestException('User id must not be equal to 0');
@@ -68,18 +70,8 @@ export class PostService {
         include: {
           likes: true,
           user: {
-            select: {
-              id: true,
-              fullname: true,
-              username: true,
-              email: true,
-              dateOfBirth: true,
-              profileUrl: true,
-              profileBackgroundUrl: true,
-              info: true,
-              role: true,
-              createdAt: true,
-              updatedAt: true,
+            omit: {
+              passwordHash: true,
             },
           },
         },
@@ -93,12 +85,7 @@ export class PostService {
           post.id,
         );
 
-        return {
-          status: HttpStatus.CREATED,
-          success: true,
-          message: 'Post created successfully',
-          data: post,
-        };
+        return post;
       }
 
       if (files && files.length) {
@@ -143,13 +130,8 @@ export class PostService {
         );
 
         return {
-          status: HttpStatus.CREATED,
-          success: true,
-          message: `Post created successfully`,
-          data: {
-            ...post,
-            filesUrl,
-          },
+          ...post,
+          filesUrl,
         };
       }
 
@@ -166,8 +148,8 @@ export class PostService {
   }
 
   async createSharePost(
-    createPostDto: CreatePostDto & { userId: number; parentId: number; },
-  ): Promise<CommonResponse> {
+    createPostDto: CreatePostDto & { userId: number; parentId: number },
+  ): Promise<Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] }> {
     const { message, userId, parentId } = createPostDto;
     if (!userId) {
       throw new BadRequestException('User id must not be equal to 0');
@@ -192,34 +174,15 @@ export class PostService {
         include: {
           likes: true,
           user: {
-            select: {
-              id: true,
-              fullname: true,
-              username: true,
-              email: true,
-              dateOfBirth: true,
-              profileUrl: true,
-              profileBackgroundUrl: true,
-              info: true,
-              role: true,
-              createdAt: true,
-              updatedAt: true,
+            omit: {
+              passwordHash: true,
             },
           },
         },
       });
-      await createNotification(
-        this.notificationService,
-        userId,
-        post,
-      );
+      await createNotification(this.notificationService, userId, post);
 
-      return {
-        status: HttpStatus.CREATED,
-        success: true,
-        message: `Share post created successfully`,
-        data: sharePost,
-      };
+      return sharePost;
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
@@ -231,24 +194,18 @@ export class PostService {
     }
   }
 
-  async findPosts(): Promise<CommonResponse> {
+  async findPosts(): Promise<
+    (Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+      filesUrl: string[];
+    })[]
+  > {
     try {
       const posts = await this.prismaService.post.findMany({
         include: {
           likes: true,
           user: {
-            select: {
-              id: true,
-              fullname: true,
-              username: true,
-              email: true,
-              dateOfBirth: true,
-              profileUrl: true,
-              profileBackgroundUrl: true,
-              info: true,
-              role: true,
-              createdAt: true,
-              updatedAt: true,
+            omit: {
+              passwordHash: true,
             },
           },
         },
@@ -278,12 +235,7 @@ export class PostService {
         }),
       );
 
-      return {
-        status: HttpStatus.OK,
-        success: true,
-        message: 'Post retrived succussfully',
-        data: postsWithFiles,
-      };
+      return postsWithFiles;
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
@@ -293,7 +245,11 @@ export class PostService {
     }
   }
 
-  async findPostById(postId: number): Promise<CommonResponse> {
+  async findPostById(postId: number): Promise<
+    Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+      filesUrl: string[];
+    }
+  > {
     if (!postId) {
       throw new BadRequestException('Post id must not be equal to 0');
     }
@@ -306,18 +262,8 @@ export class PostService {
         include: {
           likes: true,
           user: {
-            select: {
-              id: true,
-              fullname: true,
-              username: true,
-              email: true,
-              dateOfBirth: true,
-              profileUrl: true,
-              profileBackgroundUrl: true,
-              info: true,
-              role: true,
-              createdAt: true,
-              updatedAt: true,
+            omit: {
+              passwordHash: true,
             },
           },
         },
@@ -342,13 +288,8 @@ export class PostService {
       );
 
       return {
-        status: HttpStatus.OK,
-        success: true,
-        message: 'Post retrived succussfully',
-        data: {
-          ...post,
-          filesUrl: filesFromS3,
-        },
+        ...post,
+        filesUrl: filesFromS3,
       };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
@@ -361,7 +302,11 @@ export class PostService {
     }
   }
 
-  async findPostByUser(userId: number): Promise<CommonResponse> {
+  async findPostByUser(userId: number): Promise<
+    (Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+      filesUrl: string[];
+    })[]
+  > {
     if (!userId) {
       throw new BadRequestException('User id must not be equal to 0');
     }
@@ -374,18 +319,8 @@ export class PostService {
         include: {
           likes: true,
           user: {
-            select: {
-              id: true,
-              fullname: true,
-              username: true,
-              email: true,
-              dateOfBirth: true,
-              profileUrl: true,
-              profileBackgroundUrl: true,
-              info: true,
-              role: true,
-              createdAt: true,
-              updatedAt: true,
+            omit: {
+              passwordHash: true,
             },
           },
         },
@@ -417,12 +352,7 @@ export class PostService {
         }),
       );
 
-      return {
-        status: HttpStatus.OK,
-        success: true,
-        message: 'Post retrieved successfully',
-        data: postsWithFiles,
-      };
+      return postsWithFiles;
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
@@ -437,7 +367,11 @@ export class PostService {
   async updatePost(
     updatePostDto: UpdatePostDto & { postId: number },
     files?: Express.Multer.File[],
-  ): Promise<CommonResponse> {
+  ): Promise<
+    Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+      filesUrl?: string[];
+    }
+  > {
     const { message, postId } = updatePostDto;
     if (!postId) {
       throw new BadRequestException('Post id must not be equal to 0');
@@ -463,18 +397,8 @@ export class PostService {
         include: {
           likes: true,
           user: {
-            select: {
-              id: true,
-              fullname: true,
-              username: true,
-              email: true,
-              dateOfBirth: true,
-              profileUrl: true,
-              profileBackgroundUrl: true,
-              info: true,
-              role: true,
-              createdAt: true,
-              updatedAt: true,
+            omit: {
+              passwordHash: true,
             },
           },
         },
@@ -511,13 +435,8 @@ export class PostService {
         );
 
         return {
-          status: HttpStatus.OK,
-          success: true,
-          message: `Update post id ${post.id} successfully`,
-          data: {
-            ...post,
-            filesUrl,
-          },
+          ...post,
+          filesUrl,
         };
       }
 
@@ -588,13 +507,8 @@ export class PostService {
         });
 
         return {
-          status: HttpStatus.OK,
-          success: true,
-          message: `Post updated successfully`,
-          data: {
-            ...post,
-            filesUrl,
-          },
+          ...post,
+          filesUrl,
         };
       }
 
@@ -614,7 +528,7 @@ export class PostService {
     }
   }
 
-  async deletePost(postId: number): Promise<CommonResponse> {
+  async deletePost(postId: number) {
     if (!postId) {
       throw new BadRequestException('Post id must not be equal to 0');
     }
@@ -658,12 +572,6 @@ export class PostService {
           },
         }),
       ]);
-
-      return {
-        status: HttpStatus.OK,
-        success: true,
-        message: 'Post deleted successfully',
-      };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
@@ -675,7 +583,7 @@ export class PostService {
     }
   }
 
-  async deleteFile(fileId: number): Promise<CommonResponse> {
+  async deleteFile(fileId: number) {
     if (!fileId) {
       throw new BadRequestException('File id must not be equal to 0');
     }
@@ -717,12 +625,6 @@ export class PostService {
         }),
         deleteFileFromS3(this.configService, this.s3),
       ]);
-
-      return {
-        status: HttpStatus.OK,
-        success: true,
-        message: 'File deleted successfully',
-      };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);

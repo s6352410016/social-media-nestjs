@@ -27,15 +27,11 @@ export class CommonResponse {
     oneOf: [
       { type: 'object', additionalProperties: true },
       { type: 'string' },
-      { type: 'number' },
-      { type: 'boolean' },
       { type: 'array', items: { type: 'any' } },
     ],
   })
   data?:
     | Object
     | string
-    | number
-    | boolean
-    | Array<Object | string | number | boolean>;
+    | Array<any>;
 }

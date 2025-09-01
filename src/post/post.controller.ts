@@ -55,12 +55,12 @@ export class PostController {
     description: 'Post with images created successfully',
     type: CommonResponse,
   })
-  createPost(
+  async createPost(
     @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
     @Param('userId', ParseIntPipe) userId: number,
     @Body() createPostDto: CreatePostDto,
-  ): Promise<CommonResponse> {
-    return this.postService.createPost(
+  ) {
+    return await this.postService.createPost(
       {
         ...createPostDto,
         userId,
@@ -74,12 +74,12 @@ export class PostController {
     description: 'Share post created successfully',
     type: CommonResponse,
   })
-  createSharePost(
+  async createSharePost(
     @Param('userId', ParseIntPipe) userId: number,
     @Param('parentId', ParseIntPipe) parentId: number,
     @Body() createPostDto: CreatePostDto,
-  ): Promise<CommonResponse> {
-    return this.postService.createSharePost({
+  ) {
+    return await this.postService.createSharePost({
       ...createPostDto,
       userId,
       parentId,
@@ -95,8 +95,8 @@ export class PostController {
     description: 'Post retrived succussfully',
     type: CommonResponse,
   })
-  findPosts(): Promise<CommonResponse> {
-    return this.postService.findPosts();
+  async findPosts() {
+    return await this.postService.findPosts();
   }
 
   @Get('find/:postId')
@@ -108,10 +108,10 @@ export class PostController {
     description: 'Post retrived succussfully',
     type: CommonResponse,
   })
-  findPostById(
+  async findPostById(
     @Param('postId', ParseIntPipe) postId: number,
-  ): Promise<CommonResponse> {
-    return this.postService.findPostById(postId);
+  ) {
+    return await this.postService.findPostById(postId);
   }
 
   @Get('find/user/:userId')
@@ -123,10 +123,10 @@ export class PostController {
     description: 'Post retrived succussfully',
     type: CommonResponse,
   })
-  findPostByUser(
+  async findPostByUser(
     @Param('userId', ParseIntPipe) userId: number,
-  ): Promise<CommonResponse> {
-    return this.postService.findPostByUser(userId);
+  ) {
+    return await this.postService.findPostByUser(userId);
   }
 
   @Patch('update/:postId')
@@ -157,12 +157,12 @@ export class PostController {
     description: 'Post updated successfully',
     type: CommonResponse,
   })
-  updatePost(
+  async updatePost(
     @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
     @Param('postId', ParseIntPipe) postId: number,
     @Body() updatePostDto: UpdatePostDto,
-  ): Promise<CommonResponse> {
-    return this.postService.updatePost(
+  ) {
+    return await this.postService.updatePost(
       {
         ...updatePostDto,
         postId,
@@ -180,10 +180,10 @@ export class PostController {
     description: 'Not found',
     type: CommonResponse,
   })
-  deletePost(
+  async deletePost(
     @Param('postId', ParseIntPipe) postId: number,
-  ): Promise<CommonResponse> {
-    return this.postService.deletePost(postId);
+  ) {
+    await this.postService.deletePost(postId);
   }
 
   @Delete('delete/file/:fileId')
@@ -195,9 +195,9 @@ export class PostController {
     description: 'Not found',
     type: CommonResponse,
   })
-  deleteFile(
+  async deleteFile(
     @Param('fileId', ParseIntPipe) fileId: number,
-  ): Promise<CommonResponse> {
-    return this.postService.deleteFile(fileId);
+  ) {
+    await this.postService.deleteFile(fileId);
   }
 }

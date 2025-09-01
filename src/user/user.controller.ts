@@ -35,12 +35,12 @@ export class UserController {
     description: 'Reset password successfully',
     type: CommonResponse,
   })
-  resetPassword(
+  async resetPassword(
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
     @Body() resetPasswordDto: ResetPasswordDto,
-  ): Promise<CommonResponse> {
-    return this.userService.resetPassword(
+  ) {
+    await this.userService.resetPassword(
       {
         ...resetPasswordDto,
         email: (
@@ -49,8 +49,8 @@ export class UserController {
           }>
         ).email,
       },
-      res,
     );
+    res.clearCookie('reset_password_token');
   }
 
   @UseGuards(AtAuthGuard)
@@ -63,10 +63,10 @@ export class UserController {
     description: 'Users retreived successfully',
     type: CommonResponse,
   })
-  findByFullname(
+  async findByFullname(
     @Param('currentId', ParseIntPipe) currentId: number,
     @Param('query') query: string,
-  ): Promise<CommonResponse> {
-    return this.userService.findByFullname(currentId, query);
+  ) {
+    return await this.userService.findByFullname(currentId, query);
   }
 }

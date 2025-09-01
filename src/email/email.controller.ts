@@ -19,6 +19,7 @@ import {
 import { ForgotPasswordAuthGuard } from 'src/auth/guards/forgot-password-auth.guard';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtPayload } from 'src/utils/types';
+import { setCookies } from 'src/utils/helpers/set-cookies';
 
 @Controller('email')
 export class EmailController {
@@ -30,12 +31,12 @@ export class EmailController {
     description: 'Email send successfully',
     type: CommonResponse,
   })
-  sendEmail(
+  async sendEmail(
     @Body() sendEmailDto: SendEmailDto,
     @Response({ passthrough: true })
     res: ExpressResponse,
-  ): Promise<CommonResponse> {
-    return this.emailService.sendEmail(sendEmailDto, res);
+  ) {
+    return await this.emailService.sendEmail(sendEmailDto, res);
   }
 
   @UseGuards(ForgotPasswordAuthGuard)
@@ -45,13 +46,13 @@ export class EmailController {
     description: 'OTP verified successfully',
     type: CommonResponse,
   })
-  verifyOtp(
+  async verifyOtp(
     @Body() verifyOtpDto: VerifyOtpDto,
     @Request() req: ExpressRequest,
     @Response({ passthrough: true })
     res: ExpressResponse,
-  ): Promise<CommonResponse> {
-    return this.emailService.verifyOtp(
+  ) {
+    const result = await this.emailService.verifyOtp(
       {
         ...verifyOtpDto,
         email: (
@@ -60,7 +61,21 @@ export class EmailController {
           }>
         ).email,
       },
-      res,
     );
+
+    if(result.message && !result.token){
+      return {
+        message: result.message,
+      };
+    }
+
+    if (result.token && !result.message) {
+      setCookies('reset_password_token', result.token, res);
+      res.clearCookie('forgot_password_token');
+
+      return {
+        message: 'Otp verified successfully',
+      };
+    }
   }
 }

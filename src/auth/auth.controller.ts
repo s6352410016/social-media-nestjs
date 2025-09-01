@@ -33,14 +33,26 @@ import { RtAuthGuard } from './guards/rt-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { ISocialUserPayload } from 'src/utils/types';
 import { GithubAuthGuard } from './guards/github-auth.guard';
-import { UserService } from 'src/user/user.service';
-import { EmailService } from 'src/email/email.service';
+import { setCookies } from 'src/utils/helpers/set-cookies';
+import { clearCookies } from 'src/utils/helpers/clear-cookies';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
+  private CLIENT_URL: string;
+  private CLIENT_REDIRECT_SUCCESS_PATH: string;
+  private CLIENT_REDIRECT_SUCCESS_URL: string;
+
   constructor(
     private authService: AuthService,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    this.CLIENT_URL = this.configService.get<string>('CLIENT_URL')!;
+    this.CLIENT_REDIRECT_SUCCESS_PATH = this.configService.get<string>(
+      'CLIENT_REDIRECT_SUCCESS_PATH',
+    )!;
+    this.CLIENT_REDIRECT_SUCCESS_URL = `${this.CLIENT_URL}${this.CLIENT_REDIRECT_SUCCESS_PATH}`;
+  }
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
@@ -54,11 +66,18 @@ export class AuthController {
     description: 'Login successful',
     type: CommonResponse,
   })
-  login(
+  async login(
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
-  ): Promise<CommonResponse> {
-    return this.authService.login(req.user as Omit<User, 'passwordHash'>, res);
+  ) {
+    const { accessToken, refreshToken } = await this.authService.login(
+      req.user as Omit<User, 'passwordHash'>,
+    );
+    setCookies(
+      ['access_token', 'refresh_token'],
+      [accessToken, refreshToken],
+      res,
+    );
   }
 
   @Post('register')
@@ -66,8 +85,8 @@ export class AuthController {
     description: 'User created successfully',
     type: CommonResponse,
   })
-  register(@Body() createUserDto: CreateUserDto): Promise<CommonResponse> {
-    return this.authService.register(createUserDto);
+  async register(@Body() createUserDto: CreateUserDto) {
+    return await this.authService.register(createUserDto);
   }
 
   @UseGuards(AtAuthGuard)
@@ -80,14 +99,9 @@ export class AuthController {
     description: 'User profile retrieved successfully',
     type: CommonResponse,
   })
-  getProfile(@Request() req: ExpressRequest): CommonResponse {
+  getProfile(@Request() req: ExpressRequest) {
     const user = req.user as Omit<User, 'passwordHash'>;
-    return {
-      status: HttpStatus.OK,
-      success: true,
-      message: 'User profile retrieved successfully',
-      data: user,
-    };
+    return user;
   }
 
   @UseGuards(RtAuthGuard)
@@ -101,12 +115,18 @@ export class AuthController {
     description: 'Tokens refreshed successfully',
     type: CommonResponse,
   })
-  refreshToken(
+  async refreshToken(
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
-  ): Promise<CommonResponse> {
+  ) {
     const user = req.user as Omit<User, 'passwordHash'>;
-    return this.authService.refreshToken(user, res);
+    const { accessToken, refreshToken } =
+      await this.authService.refreshToken(user);
+    setCookies(
+      ['access_token', 'refresh_token'],
+      [accessToken, refreshToken],
+      res,
+    );
   }
 
   @UseGuards(AtAuthGuard)
@@ -116,10 +136,8 @@ export class AuthController {
     description: 'Logged out successfully',
     type: CommonResponse,
   })
-  logout(
-    @Response({ passthrough: true }) res: ExpressResponse,
-  ): CommonResponse {
-    return this.authService.logout(res);
+  logout(@Response({ passthrough: true }) res: ExpressResponse) {
+    clearCookies(res, 'access_token', 'refresh_token');
   }
 
   @UseGuards(GoogleAuthGuard)
@@ -136,15 +154,26 @@ export class AuthController {
   @ApiFoundResponse({
     description: 'Redirected after google login',
   })
-  googleLoginCallback(
+  async googleLoginCallback(
     @Request() req: ExpressRequest,
-    @Response({ passthrough: true }) res: ExpressResponse,
+    @Response() res: ExpressResponse,
   ) {
-    return this.authService.socialLogin(
+    const { success, url, token } = await this.authService.socialLogin(
       req.user as ISocialUserPayload,
-      res,
       ProviderType.GOOGLE,
     );
+    if (!success && url && !token) {
+      res.redirect(url);
+    }
+
+    if (success && !url && token) {
+      setCookies(
+        ['access_token', 'refresh_token'],
+        [token.accessToken, token.refreshToken],
+        res,
+      );
+      res.redirect(this.CLIENT_REDIRECT_SUCCESS_URL);
+    }
   }
 
   @UseGuards(GithubAuthGuard)
@@ -161,14 +190,25 @@ export class AuthController {
   @ApiFoundResponse({
     description: 'Redirected after Github login',
   })
-  githubLoginCallback(
+  async githubLoginCallback(
     @Request() req: ExpressRequest,
-    @Response({ passthrough: true }) res: ExpressResponse,
+    @Response() res: ExpressResponse,
   ) {
-    return this.authService.socialLogin(
+    const { success, url, token } = await this.authService.socialLogin(
       req.user as ISocialUserPayload,
-      res,
       ProviderType.GITHUB,
     );
+    if (!success && url && !token) {
+      res.redirect(url);
+    }
+
+    if (success && !url && token) {
+      setCookies(
+        ['access_token', 'refresh_token'],
+        [token.accessToken, token.refreshToken],
+        res,
+      );
+      res.redirect(this.CLIENT_REDIRECT_SUCCESS_URL);
+    }
   }
 }

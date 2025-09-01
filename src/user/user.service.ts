@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -10,11 +9,9 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { hashSecret } from 'src/utils/helpers/hash-secret';
-import { CommonResponse } from 'src/utils/swagger/common-response';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CreateSocialUserDto } from 'src/utils/types';
 import { formatString } from 'src/utils/helpers/format-string';
-import { Response as ExpressResponse } from 'express';
 
 @Injectable()
 export class UserService {
@@ -27,19 +24,7 @@ export class UserService {
       where: {
         username,
       },
-      select: {
-        id: true,
-        fullname: true,
-        username: true,
-        email: true,
-        passwordHash: true,
-        dateOfBirth: true,
-        profileUrl: true,
-        profileBackgroundUrl: true,
-        info: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
         provider: true,
       },
     });
@@ -47,9 +32,7 @@ export class UserService {
 
   async createUser(
     createUserDto: CreateUserDto | CreateSocialUserDto,
-  ): Promise<
-    (Omit<User, 'passwordHash'> & { provider: Provider | null }) | never
-  > {
+  ): Promise<Omit<User, 'passwordHash'> & { provider: Provider | null }> {
     const {
       fullname,
       username,
@@ -76,18 +59,10 @@ export class UserService {
               },
             },
           },
-          select: {
-            id: true,
-            fullname: true,
-            username: true,
-            email: true,
-            dateOfBirth: true,
-            profileUrl: true,
-            profileBackgroundUrl: true,
-            info: true,
-            role: true,
-            createdAt: true,
-            updatedAt: true,
+          omit: {
+            passwordHash: true,
+          },
+          include: {
             provider: true,
           },
         });
@@ -107,18 +82,10 @@ export class UserService {
               },
             },
           },
-          select: {
-            id: true,
-            fullname: true,
-            username: true,
-            email: true,
-            dateOfBirth: true,
-            profileUrl: true,
-            profileBackgroundUrl: true,
-            info: true,
-            role: true,
-            createdAt: true,
-            updatedAt: true,
+          omit: {
+            passwordHash: true,
+          },
+          include: {
             provider: true,
           },
         });
@@ -139,32 +106,25 @@ export class UserService {
     }
   }
 
-  async findById(id: number): Promise<Omit<User, 'passwordHash'> | null> {
+  async findById(
+    id: number,
+  ): Promise<
+    (Omit<User, 'passwordHash'> & { provider: Provider | null }) | null
+  > {
     return await this.prisma.user.findUnique({
       where: {
         id,
       },
-      select: {
-        id: true,
-        fullname: true,
-        username: true,
-        email: true,
-        dateOfBirth: true,
-        profileUrl: true,
-        profileBackgroundUrl: true,
-        info: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
+      omit: {
+        passwordHash: true,
+      },
+      include: {
         provider: true,
       },
     });
   }
 
-  async resetPassword(
-    resetPasswordDto: ResetPasswordDto & { email: string },
-    res: ExpressResponse,
-  ): Promise<CommonResponse> {
+  async resetPassword(resetPasswordDto: ResetPasswordDto & { email: string }) {
     const { password, confirmPassword, email } = resetPasswordDto;
     if (password !== confirmPassword) {
       throw new BadRequestException('Passwords do not match');
@@ -180,12 +140,6 @@ export class UserService {
           passwordHash,
         },
       });
-      res.clearCookie('reset_password_token');
-      return {
-        status: 200,
-        success: true,
-        message: 'Password reset successfully',
-      };
     } catch (error: unknown) {
       if (
         error instanceof PrismaClientKnownRequestError &&
@@ -209,18 +163,10 @@ export class UserService {
       where: {
         email,
       },
-      select: {
-        id: true,
-        fullname: true,
-        username: true,
-        email: true,
-        dateOfBirth: true,
-        profileUrl: true,
-        profileBackgroundUrl: true,
-        info: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
+      omit: {
+        passwordHash: true,
+      },
+      include: {
         provider: true,
       },
     });
@@ -229,8 +175,8 @@ export class UserService {
   async findByFullname(
     currentId: number,
     query: string,
-  ): Promise<CommonResponse> {
-    const users = await this.prisma.user.findMany({
+  ): Promise<(Omit<User, 'passwordHash'> & { provider: Provider | null })[]> {
+    return this.prisma.user.findMany({
       where: {
         fullname: {
           contains: query,
@@ -240,26 +186,12 @@ export class UserService {
           not: currentId,
         },
       },
-      select: {
-        id: true,
-        fullname: true,
-        username: true,
-        email: true,
-        dateOfBirth: true,
-        profileUrl: true,
-        profileBackgroundUrl: true,
-        info: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
+      omit: {
+        passwordHash: true,
+      },
+      include: {
         provider: true,
       },
     });
-    return {
-      status: HttpStatus.OK,
-      success: true,
-      message: 'Users retreived successfully',
-      data: users,
-    };
   }
 }

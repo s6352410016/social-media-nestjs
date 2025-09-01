@@ -14,10 +14,7 @@ export interface ISocialUserPayload {
   avatar: string;
 }
 
-export type CreateSocialUserDto = Omit<
-  CreateUserDto,
-  'password' | 'username'
-> &
+export type CreateSocialUserDto = Omit<CreateUserDto, 'password' | 'username'> &
   Partial<Pick<CreateUserDto, 'password' | 'username'>>;
 
 export interface IEmailOptions {
@@ -25,7 +22,7 @@ export interface IEmailOptions {
   to: string;
   subject: string;
   html: string;
-}  
+}
 
 export interface ICreateFileRecord {
   fileUrl: string;
@@ -34,3 +31,8 @@ export interface ICreateFileRecord {
 }
 
 export type FileDir = 'post-image' | 'post-video';
+
+export interface ResponseFromService {
+  message?: string;
+  data?: Object | string | Array<any>;
+}
