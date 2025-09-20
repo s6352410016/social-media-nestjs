@@ -3,6 +3,7 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  InternalServerErrorException,
   Post,
   Request,
   Response,
@@ -18,7 +19,7 @@ import {
 } from 'express';
 import { ForgotPasswordAuthGuard } from 'src/auth/guards/forgot-password-auth.guard';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { JwtPayload } from 'src/utils/types';
+import { JwtPayload, ResponseFromService } from 'src/utils/types';
 import { setCookies } from 'src/utils/helpers/set-cookies';
 
 @Controller('email')
@@ -35,7 +36,7 @@ export class EmailController {
     @Body() sendEmailDto: SendEmailDto,
     @Response({ passthrough: true })
     res: ExpressResponse,
-  ) {
+  ): Promise<ResponseFromService> {
     return await this.emailService.sendEmail(sendEmailDto, res);
   }
 
@@ -51,7 +52,7 @@ export class EmailController {
     @Request() req: ExpressRequest,
     @Response({ passthrough: true })
     res: ExpressResponse,
-  ) {
+  ): Promise<ResponseFromService> {
     const result = await this.emailService.verifyOtp(
       {
         ...verifyOtpDto,
@@ -77,5 +78,7 @@ export class EmailController {
         message: 'Otp verified successfully',
       };
     }
+
+    throw new InternalServerErrorException('Something went wrong');
   }
 }

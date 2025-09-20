@@ -31,7 +31,7 @@ import { SignInUserDto } from './dto/signin-user.dto';
 import { AtAuthGuard } from './guards/at-auth.guard';
 import { RtAuthGuard } from './guards/rt-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
-import { ISocialUserPayload } from 'src/utils/types';
+import { ISocialUserPayload, ResponseFromService } from 'src/utils/types';
 import { GithubAuthGuard } from './guards/github-auth.guard';
 import { setCookies } from 'src/utils/helpers/set-cookies';
 import { clearCookies } from 'src/utils/helpers/clear-cookies';
@@ -63,13 +63,13 @@ export class AuthController {
     type: CommonResponse,
   })
   @ApiOkResponse({
-    description: 'Login successful',
+    description: 'Login successfully',
     type: CommonResponse,
   })
   async login(
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
-  ) {
+  ): Promise<ResponseFromService> {
     const { accessToken, refreshToken } = await this.authService.login(
       req.user as Omit<User, 'passwordHash'>,
     );
@@ -78,6 +78,9 @@ export class AuthController {
       [accessToken, refreshToken],
       res,
     );
+    return {
+      message: 'Login successfully',
+    }
   }
 
   @Post('register')
@@ -85,8 +88,12 @@ export class AuthController {
     description: 'User created successfully',
     type: CommonResponse,
   })
-  async register(@Body() createUserDto: CreateUserDto) {
-    return await this.authService.register(createUserDto);
+  async register(@Body() createUserDto: CreateUserDto): Promise<ResponseFromService> {
+    const user = await this.authService.register(createUserDto);
+    return {
+      message: 'User created successfully',
+      data: user,
+    }
   }
 
   @UseGuards(AtAuthGuard)
@@ -99,9 +106,12 @@ export class AuthController {
     description: 'User profile retrieved successfully',
     type: CommonResponse,
   })
-  getProfile(@Request() req: ExpressRequest) {
+  getProfile(@Request() req: ExpressRequest): ResponseFromService {
     const user = req.user as Omit<User, 'passwordHash'>;
-    return user;
+    return {
+      message: 'User profile retrieved successfully',
+      data: user,
+    };
   }
 
   @UseGuards(RtAuthGuard)
@@ -118,7 +128,7 @@ export class AuthController {
   async refreshToken(
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
-  ) {
+  ): Promise<ResponseFromService> {
     const user = req.user as Omit<User, 'passwordHash'>;
     const { accessToken, refreshToken } =
       await this.authService.refreshToken(user);
@@ -127,6 +137,9 @@ export class AuthController {
       [accessToken, refreshToken],
       res,
     );
+    return {
+      message: 'Tokens refreshed successfully',
+    }
   }
 
   @UseGuards(AtAuthGuard)
@@ -136,8 +149,11 @@ export class AuthController {
     description: 'Logged out successfully',
     type: CommonResponse,
   })
-  logout(@Response({ passthrough: true }) res: ExpressResponse) {
+  logout(@Response({ passthrough: true }) res: ExpressResponse): ResponseFromService {
     clearCookies(res, 'access_token', 'refresh_token');
+    return {
+      message: 'Logged out successfully',
+    }
   }
 
   @UseGuards(GoogleAuthGuard)

@@ -5,6 +5,7 @@ import {
   Param,
   ParseIntPipe,
   Patch,
+  Query,
   Request,
   Response,
   UseGuards,
@@ -13,7 +14,7 @@ import { ApiOkResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { ResetPasswordAuthGuard } from 'src/auth/guards/reset-password-auth.guard';
 import { CommonResponse } from 'src/utils/swagger/common-response';
 import { UserService } from './user.service';
-import { JwtPayload } from 'src/utils/types';
+import { JwtPayload, ResponseFromService } from 'src/utils/types';
 import {
   Request as ExpressRequest,
   Response as ExpressResponse,
@@ -39,7 +40,7 @@ export class UserController {
     @Request() req: ExpressRequest,
     @Response({ passthrough: true }) res: ExpressResponse,
     @Body() resetPasswordDto: ResetPasswordDto,
-  ) {
+  ): Promise<ResponseFromService> {
     await this.userService.resetPassword(
       {
         ...resetPasswordDto,
@@ -51,10 +52,13 @@ export class UserController {
       },
     );
     res.clearCookie('reset_password_token');
+    return {
+      message: 'Reset password successfully',
+    }
   }
 
   @UseGuards(AtAuthGuard)
-  @Get('find-by-fullname/:currentId/:query')
+  @Get('find-by-fullname/:currentId')
   @ApiUnauthorizedResponse({
     description: 'Unauthorized',
     type: CommonResponse,
@@ -65,8 +69,12 @@ export class UserController {
   })
   async findByFullname(
     @Param('currentId', ParseIntPipe) currentId: number,
-    @Param('query') query: string,
-  ) {
-    return await this.userService.findByFullname(currentId, query);
+    @Query('fullname') fullname: string,
+  ): Promise<ResponseFromService> {
+    const users = await this.userService.findByFullname(currentId, fullname);
+    return {
+      message: 'Users retreived successfully',
+      data: users,
+    }
   }
 }

@@ -21,11 +21,11 @@ export class TransformInterceptor<T>
     const response = context.switchToHttp().getResponse<ExpressResponse>();
 
     return next.handle().pipe(
-      map((data: ResponseFromService) => ({
+      map((data?: ResponseFromService) => ({
         status: response.statusCode,
         success: true,
-        message: data.message ?? 'operations successfully',
-        ...(data.data ? { data: data.data } : {}),
+        message: data ? data.message : 'Operation successfully',
+        ...(data && data.data ? { data: data.data } : {}),
       })),
     );
   }

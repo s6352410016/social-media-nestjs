@@ -25,6 +25,7 @@ import { AtAuthGuard } from 'src/auth/guards/at-auth.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FileTypeValidationPipe } from 'src/utils/validations/file-type-validation-pipe';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { ResponseFromService } from 'src/utils/types';
 import { Express } from 'express';
 
 @UseGuards(AtAuthGuard)
@@ -59,14 +60,18 @@ export class PostController {
     @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
     @Param('userId', ParseIntPipe) userId: number,
     @Body() createPostDto: CreatePostDto,
-  ) {
-    return await this.postService.createPost(
+  ): Promise<ResponseFromService> {
+    const post = await this.postService.createPost(
       {
         ...createPostDto,
         userId,
       },
       files,
     );
+    return {
+      message: 'Post with images created successfully',
+      data: post,
+    }
   }
 
   @Post('share/create/:userId/:parentId')
@@ -78,12 +83,16 @@ export class PostController {
     @Param('userId', ParseIntPipe) userId: number,
     @Param('parentId', ParseIntPipe) parentId: number,
     @Body() createPostDto: CreatePostDto,
-  ) {
-    return await this.postService.createSharePost({
+  ): Promise<ResponseFromService> {
+    const sharePost = await this.postService.createSharePost({
       ...createPostDto,
       userId,
       parentId,
     });
+    return {
+      message: 'Share post created successfully',
+      data: sharePost,
+    }
   }
 
   @Get('find')
@@ -95,8 +104,12 @@ export class PostController {
     description: 'Post retrived succussfully',
     type: CommonResponse,
   })
-  async findPosts() {
-    return await this.postService.findPosts();
+  async findPosts(): Promise<ResponseFromService> {
+    const posts = await this.postService.findPosts();
+    return {
+      message: 'Post retrived succussfully',
+      data: posts,
+    }
   }
 
   @Get('find/:postId')
@@ -110,8 +123,12 @@ export class PostController {
   })
   async findPostById(
     @Param('postId', ParseIntPipe) postId: number,
-  ) {
-    return await this.postService.findPostById(postId);
+  ): Promise<ResponseFromService> {
+    const post = await this.postService.findPostById(postId);
+    return {
+      message: 'Post retrived succussfully',
+      data: post,
+    }
   }
 
   @Get('find/user/:userId')
@@ -125,8 +142,12 @@ export class PostController {
   })
   async findPostByUser(
     @Param('userId', ParseIntPipe) userId: number,
-  ) {
-    return await this.postService.findPostByUser(userId);
+  ): Promise<ResponseFromService> {
+    const posts = await this.postService.findPostByUser(userId);
+    return {
+      message: 'Post retrived succussfully',
+      data: posts,
+    }
   }
 
   @Patch('update/:postId')
@@ -161,14 +182,18 @@ export class PostController {
     @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
     @Param('postId', ParseIntPipe) postId: number,
     @Body() updatePostDto: UpdatePostDto,
-  ) {
-    return await this.postService.updatePost(
+  ): Promise<ResponseFromService> {
+    const post = await this.postService.updatePost(
       {
         ...updatePostDto,
         postId,
       },
       files,
     );
+    return {
+      message: 'Post updated successfully',
+      data: post,
+    }
   }
 
   @Delete('delete/:postId')
@@ -182,8 +207,11 @@ export class PostController {
   })
   async deletePost(
     @Param('postId', ParseIntPipe) postId: number,
-  ) {
+  ): Promise<ResponseFromService> {
     await this.postService.deletePost(postId);
+    return {
+      message: 'Post deleted successfully',
+    }
   }
 
   @Delete('delete/file/:fileId')
@@ -197,7 +225,10 @@ export class PostController {
   })
   async deleteFile(
     @Param('fileId', ParseIntPipe) fileId: number,
-  ) {
+  ): Promise<ResponseFromService> {
     await this.postService.deleteFile(fileId);
+    return {
+      message: 'File deleted successfully',
+    }
   }
 }

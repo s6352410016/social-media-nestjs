@@ -24,18 +24,42 @@ export class NotificationService {
     }
   }
 
-  findPagination(cursor?: number, limit: number = 5): Promise<Notification[]> {
-    return this.prismaService.notification.findMany({
-      take: -limit,
-      skip: cursor ? 1 : 0,
+  async findPagination(
+    cursor?: number,
+    limit: number = 5,
+  ): Promise<{
+    notifies: Notification[];
+    nextCursor: number | null;
+  }> {
+    const notifies = await this.prismaService.notification.findMany({
+      take: -(limit + 1),
       cursor: cursor
         ? {
             id: cursor,
           }
         : undefined,
+      include: {
+        sender: {
+          omit: {
+            passwordHash: true,
+          },
+        },
+      },  
       orderBy: {
-        id: "desc",
+        createdAt: 'asc',
       },
     });
+
+    let nextCursor: number | null = null;
+
+    if (notifies.length > limit) {
+      const nextItem = notifies.shift();
+      nextCursor = nextItem!.id;
+    }
+    
+    return {
+      notifies,
+      nextCursor,
+    };
   }
 }

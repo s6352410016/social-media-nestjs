@@ -33,6 +33,6 @@ export interface ICreateFileRecord {
 export type FileDir = 'post-image' | 'post-video';
 
 export interface ResponseFromService {
-  message?: string;
+  message: string;
   data?: Object | string | Array<any>;
 }
