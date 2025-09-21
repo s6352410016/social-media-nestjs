@@ -10,20 +10,22 @@ export async function createNotifications(
   postId: number,
 ) {
   const users = await prismaService.user.findMany({
-    select: {
-      id: true,
+    where: {
+      id: {
+        not: activeUserId,
+      },
+    },
+    omit: {
+      passwordHash: true,
     },
   });
-  const notifications: CreateNotificationDto[] = users
-    .filter((user) => user.id !== activeUserId)
-    .map((user) => {
-      return {
-        type: NotificationType.POST,
-        senderId: activeUserId,
-        receiverId: user.id,
-        postId,
-        message: 'Create a new post',
-      };
-    });
-  return notificationService.create(notifications);
+  const notifications: CreateNotificationDto[] = users.map((user) => ({
+    type: NotificationType.POST,
+    senderId: activeUserId,
+    receiverId: user.id,
+    postId,
+    message: 'Create a new post',
+  }));
+
+  return notificationService.createMany(notifications);
 }

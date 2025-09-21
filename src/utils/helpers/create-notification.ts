@@ -1,7 +1,7 @@
 import { NotificationType, Post } from 'generated/prisma';
 import { NotificationService } from 'src/notification/notification.service';
 
-export async function createNotification(
+export function createNotification(
   notificationService: NotificationService,
   activeUserId: number,
   post: Post,

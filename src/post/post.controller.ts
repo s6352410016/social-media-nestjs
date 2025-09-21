@@ -53,7 +53,7 @@ export class PostController {
     },
   })
   @ApiCreatedResponse({
-    description: 'Post with images created successfully',
+    description: 'Post created successfully',
     type: CommonResponse,
   })
   async createPost(
@@ -69,7 +69,7 @@ export class PostController {
       files,
     );
     return {
-      message: 'Post with images created successfully',
+      message: 'Post created successfully',
       data: post,
     }
   }

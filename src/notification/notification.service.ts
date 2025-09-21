@@ -8,9 +8,21 @@ import { Notification } from 'generated/prisma';
 export class NotificationService {
   constructor(private prismaService: PrismaService) {}
 
-  create(
-    createNotificationDto: CreateNotificationDto | CreateNotificationDto[],
-  ) {
+  create(createNotificationDto: CreateNotificationDto) {
+    try {
+      return this.prismaService.notification.create({
+        data: createNotificationDto,
+      });
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(error.message);
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  createMany(createNotificationDto: CreateNotificationDto[]) {
     try {
       return this.prismaService.notification.createMany({
         data: createNotificationDto,
@@ -44,9 +56,9 @@ export class NotificationService {
             passwordHash: true,
           },
         },
-      },  
+      },
       orderBy: {
-        createdAt: 'asc',
+        createdAt: 'desc',
       },
     });
 
@@ -56,7 +68,7 @@ export class NotificationService {
       const nextItem = notifies.shift();
       nextCursor = nextItem!.id;
     }
-    
+
     return {
       notifies,
       nextCursor,
