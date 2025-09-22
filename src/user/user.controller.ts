@@ -3,7 +3,7 @@ import {
   Controller,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Query,
   Request,
@@ -51,6 +51,7 @@ export class UserController {
         ).email,
       },
     );
+
     res.clearCookie('reset_password_token');
     return {
       message: 'Reset password successfully',
@@ -68,10 +69,11 @@ export class UserController {
     type: CommonResponse,
   })
   async findByFullname(
-    @Param('currentId', ParseIntPipe) currentId: number,
+    @Param('currentId', ParseUUIDPipe) currentId: string,
     @Query('fullname') fullname: string,
   ): Promise<ResponseFromService> {
     const users = await this.userService.findByFullname(currentId, fullname);
+    
     return {
       message: 'Users retreived successfully',
       data: users,

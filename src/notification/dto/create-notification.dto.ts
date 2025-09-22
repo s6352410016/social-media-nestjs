@@ -8,19 +8,19 @@ export class CreateNotificationDto {
 
   @IsInt()
   @IsNotEmpty()
-  senderId: number;
+  senderId: string;
 
   @IsInt()
   @IsNotEmpty()
-  receiverId: number;
+  receiverId: string;
 
   @IsInt()
   @IsNotEmpty()
-  postId?: number;
+  postId?: string;
 
   @IsInt()
   @IsNotEmpty()
-  commentId?: number;
+  commentId?: string;
 
   @IsString()
   @IsNotEmpty()

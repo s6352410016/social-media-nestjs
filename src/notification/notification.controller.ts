@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   ParseIntPipe,
+  ParseUUIDPipe,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -26,13 +27,14 @@ export class NotificationController {
     type: CommonResponse,
   })
   async findNotifications(
-    @Query('cursor', ParseIntPipe) cursor?: number,
+    @Query('cursor', ParseUUIDPipe) cursor?: string,
     @Query('limit', ParseIntPipe) limit?: number,
   ): Promise<ResponseFromService> {
     const notifies = await this.notificationService.findPagination(
       cursor,
       limit,
     );
+    
     return {
       message: 'Notifications retreived successfully',
       data: notifies,

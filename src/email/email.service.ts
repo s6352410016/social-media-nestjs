@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -10,11 +11,11 @@ import { hashSecret } from 'src/utils/helpers/hash-secret';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { IEmailOptions } from 'src/utils/types';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { Otp } from 'generated/prisma';
+import { ProviderType } from 'generated/prisma';
 import { JwtService } from '@nestjs/jwt';
 import { Response as ExpressResponse } from 'express';
-import { setCookies } from 'src/utils/helpers/set-cookies';
 import { createJwt } from 'src/utils/helpers/create-jwt';
+import { UserService } from 'src/user/user.service';
 import * as nodemailer from 'nodemailer';
 import * as bcrypt from 'bcrypt';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
@@ -31,6 +32,7 @@ export class EmailService {
     private prismaService: PrismaService,
     private jwtService: JwtService,
     private configServiceP: ConfigService,
+    private userService: UserService,
   ) {
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -41,11 +43,32 @@ export class EmailService {
     });
   }
 
-  async sendEmail(
-    sendEmailDto: SendEmailDto,
-    res: ExpressResponse,
-  ) {
+  async sendEmail(sendEmailDto: SendEmailDto, res: ExpressResponse) {
     const { email } = sendEmailDto;
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      throw new NotFoundException(`Email ${email} not found`);
+    }
+
+    const providerTypeUser = user.provider?.providerType;
+    if (
+      providerTypeUser === ProviderType.GOOGLE ||
+      providerTypeUser === ProviderType.GITHUB
+    ) {
+      throw new BadRequestException(
+        'Cannot reset password for social login users',
+      );
+    }
+
+    const oldOtp = await this.prismaService.otp.findFirst({
+      where: {
+        email,
+      },
+    });
+    if(oldOtp){
+      await this.deleteOtp(oldOtp.email);
+    }
+
     const otp = `${Math.floor(Math.random() * 900000 + 100000)}`; // สร้าง OTP 6 หลัก
     const otpHash = await hashSecret(otp);
     try {
@@ -72,29 +95,31 @@ export class EmailService {
         this.configServiceP.get<string>('FORGOT_PASSWORD_SECRET')!,
         this.jwtService,
       );
-      setCookies('forgot_password_token', token, res);
+
       return {
-        message: `Email send to ${result.accepted[0]} successfully`,
+        result,
+        token,
       };
     } catch (error: unknown) {
       if (
         error instanceof PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        return {
-          message: 'Otp already exist in your email',
-        };
+        throw new BadRequestException('Otp already exist in your email');
+      } else if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
       }
 
-      return {
-        message: 'Failed to send email',
-      };
+      throw new InternalServerErrorException('Failed to send email');
     }
   }
 
-  async deleteOtp(email: string): Promise<Otp> {
+  async deleteOtp(email: string) {
     try {
-      return await this.prismaService.otp.delete({
+      return await this.prismaService.otp.deleteMany({
         where: { email },
       });
     } catch (error: unknown) {
@@ -109,9 +134,7 @@ export class EmailService {
     }
   }
 
-  async verifyOtp(
-    verifyOtpDto: VerifyOtpDto & { email: string },
-  ) {
+  async verifyOtp(verifyOtpDto: VerifyOtpDto & { email: string }) {
     const { email, otp } = verifyOtpDto;
     try {
       const otpRecord = await this.prismaService.otp.findFirst({
@@ -125,20 +148,13 @@ export class EmailService {
 
       if (!otpRecord) {
         await this.deleteOtp(email);
-
-        return {
-          message: 'OTP not found or expired',
-          token: null,
-        };
+        throw new BadRequestException('Otp expried or not found');
       }
 
       const isOtpValid = await bcrypt.compare(otp, otpRecord.otpHash);
 
       if (!isOtpValid) {
-        return {
-          message: 'Invalid OTP',
-          token: null,
-        };
+        throw new BadRequestException('Otp is invalid');
       }
 
       await this.deleteOtp(email);
@@ -151,19 +167,16 @@ export class EmailService {
         this.jwtService,
       );
 
-      return {
-        message: null,
-        token,
-      }
+      return token;
     } catch (error: unknown) {
-      if (error instanceof NotFoundException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
 
-      return {
-        message: 'Failed to verify otp',
-        token: null,
-      };
+      throw new InternalServerErrorException('Failed to verify otp');
     }
   }
 }

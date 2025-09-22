@@ -3,7 +3,7 @@ import { ICreateFileRecord } from "../types";
 
 export function createFileRecords(
   newFilesName: string[],
-  contentId: number,
+  contentId: string,
   contentType: ContentType,
 ): ICreateFileRecord[] {
   return newFilesName.map((file) => ({

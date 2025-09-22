@@ -8,20 +8,9 @@ export class CommonResponse {
   success: boolean;
 
   @ApiProperty({
-    oneOf: [
-      { type: 'object', additionalProperties: true },
-      { type: 'string' },
-      { type: 'number' },
-      { type: 'boolean' },
-      { type: 'array', items: { type: 'any' } },
-    ],
+    oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   })
-  message:
-    | Object
-    | string
-    | number
-    | boolean
-    | Array<Object | string | number | boolean>;
+  message: string | string[];
 
   @ApiPropertyOptional({
     oneOf: [
@@ -30,8 +19,5 @@ export class CommonResponse {
       { type: 'array', items: { type: 'any' } },
     ],
   })
-  data?:
-    | Object
-    | string
-    | Array<any>;
+  data?: Object | string | any[];
 }

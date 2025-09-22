@@ -49,7 +49,7 @@ enum NotificationType {
 }
 
 model User {
-  id                   Int       @id @default(autoincrement())
+  id                   String    @id @default(uuid())
   fullname             String
   username             String?   @unique
   email                String    @unique
@@ -80,8 +80,8 @@ model Provider {
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId Int  @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique @map("user_id")
 
   @@map("providers")
 }
@@ -100,16 +100,16 @@ model Otp {
 }
 
 model Post {
-  id        Int      @id @default(autoincrement())
-  message   String
+  id        String   @id @default(uuid())
+  message   String?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId Int  @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
 
-  parent   Post? @relation("PostToSharePosts", fields: [parentId], references: [id], onDelete: Cascade)
-  parentId Int?  @map("parent_id")
+  parent   Post?   @relation("PostToSharePosts", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId String? @map("parent_id")
 
   sharePosts    Post[]         @relation("PostToSharePosts")
   comments      Comment[]
@@ -120,19 +120,19 @@ model Post {
 }
 
 model Comment {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   message   String
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId Int  @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String @map("post_id")
 
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId Int  @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
 
   parent   Comment? @relation("CommentToReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  parentId Int?     @map("parent_id")
+  parentId String?  @map("parent_id")
 
   replies       Comment[]      @relation("CommentToReplies")
   likes         Like[]
@@ -142,28 +142,28 @@ model Comment {
 }
 
 model File {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   fileUrl   String   @map("file_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  contentId   Int         @map("content_id")
+  contentId   String         @map("content_id")
   contentType ContentType @map("content_type")
 
   @@unique([contentId, contentType, fileUrl])
   @@map("files")
 }
-
+ 
 model Like {
-  id     Int  @id @default(autoincrement())
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId Int  @map("user_id")
+  id     Int    @id @default(autoincrement())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
 
-  post   Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId Int?  @map("post_id")
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String? @map("post_id")
 
   comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  commentId Int?     @map("comment_id")
+  commentId String?  @map("comment_id")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -174,13 +174,12 @@ model Like {
 }
 
 model Notification {
-  // id         String           @id @default(uuid())
-  id     Int  @id @default(autoincrement())
+  id         String           @id @default(uuid())
   type       NotificationType
-  senderId   Int              @map("sender_id")
-  receiverId Int              @map("receiver_id")
-  postId     Int?             @map("post_id")
-  commentId  Int?             @map("comment_id")
+  senderId   String           @map("sender_id")
+  receiverId String           @map("receiver_id")
+  postId     String?          @map("post_id")
+  commentId  String?          @map("comment_id")
   message    String
   isRead     Boolean          @default(false) @map("is_read")
   createdAt  DateTime         @default(now()) @map("created_at")

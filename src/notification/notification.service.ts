@@ -37,11 +37,11 @@ export class NotificationService {
   }
 
   async findPagination(
-    cursor?: number,
+    cursor?: string,
     limit: number = 5,
   ): Promise<{
     notifies: Notification[];
-    nextCursor: number | null;
+    nextCursor: string | null;
   }> {
     const notifies = await this.prismaService.notification.findMany({
       take: -(limit + 1),
@@ -62,7 +62,7 @@ export class NotificationService {
       },
     });
 
-    let nextCursor: number | null = null;
+    let nextCursor: string | null = null;
 
     if (notifies.length > limit) {
       const nextItem = notifies.shift();

@@ -73,6 +73,7 @@ export class AuthController {
     const { accessToken, refreshToken } = await this.authService.login(
       req.user as Omit<User, 'passwordHash'>,
     );
+
     setCookies(
       ['access_token', 'refresh_token'],
       [accessToken, refreshToken],
@@ -90,6 +91,7 @@ export class AuthController {
   })
   async register(@Body() createUserDto: CreateUserDto): Promise<ResponseFromService> {
     const user = await this.authService.register(createUserDto);
+
     return {
       message: 'User created successfully',
       data: user,
@@ -132,6 +134,7 @@ export class AuthController {
     const user = req.user as Omit<User, 'passwordHash'>;
     const { accessToken, refreshToken } =
       await this.authService.refreshToken(user);
+
     setCookies(
       ['access_token', 'refresh_token'],
       [accessToken, refreshToken],
@@ -178,10 +181,10 @@ export class AuthController {
       req.user as ISocialUserPayload,
       ProviderType.GOOGLE,
     );
+
     if (!success && url && !token) {
       res.redirect(url);
     }
-
     if (success && !url && token) {
       setCookies(
         ['access_token', 'refresh_token'],
@@ -214,10 +217,10 @@ export class AuthController {
       req.user as ISocialUserPayload,
       ProviderType.GITHUB,
     );
+
     if (!success && url && !token) {
       res.redirect(url);
     }
-
     if (success && !url && token) {
       setCookies(
         ['access_token', 'refresh_token'],

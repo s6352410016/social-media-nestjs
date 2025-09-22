@@ -6,8 +6,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export async function createNotifications(
   prismaService: PrismaService,
   notificationService: NotificationService,
-  activeUserId: number,
-  postId: number,
+  activeUserId: string,
+  postId: string,
 ) {
   const users = await prismaService.user.findMany({
     where: {

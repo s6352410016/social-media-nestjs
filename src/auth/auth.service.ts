@@ -35,7 +35,7 @@ export class AuthService {
     return null;
   }
 
-  async login(user: Omit<User, 'passwordHash'>) {
+  login(user: Omit<User, 'passwordHash'>) {
     return createJwtUser(user, this.jwtService, this.configService);
   }
 
@@ -43,7 +43,7 @@ export class AuthService {
     return this.userService.createUser(createUserDto);
   }
 
-  async refreshToken(user: Omit<User, 'passwordHash'>) {
+  refreshToken(user: Omit<User, 'passwordHash'>) {
     return createJwtUser(user, this.jwtService, this.configService);
   }
 

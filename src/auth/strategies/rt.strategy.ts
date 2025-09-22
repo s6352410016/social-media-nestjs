@@ -25,7 +25,7 @@ export class RtStrategy extends PassportStrategy(Strategy, 'refresh-token') {
     });
   }
 
-  validate(payload: JwtPayload<{ id: number }>): Promise<Omit<User, 'passwordHash'> | null> {
+  validate(payload: JwtPayload<{ id: string }>): Promise<Omit<User, 'passwordHash'> | null> {
     return this.userService.findById(payload.id);
   }
 }

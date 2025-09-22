@@ -4,7 +4,7 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   UploadedFiles,
@@ -49,7 +49,6 @@ export class PostController {
           },
         },
       },
-      required: ['message'],
     },
   })
   @ApiCreatedResponse({
@@ -58,7 +57,7 @@ export class PostController {
   })
   async createPost(
     @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
-    @Param('userId', ParseIntPipe) userId: number,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body() createPostDto: CreatePostDto,
   ): Promise<ResponseFromService> {
     const post = await this.postService.createPost(
@@ -68,6 +67,7 @@ export class PostController {
       },
       files,
     );
+
     return {
       message: 'Post created successfully',
       data: post,
@@ -80,8 +80,8 @@ export class PostController {
     type: CommonResponse,
   })
   async createSharePost(
-    @Param('userId', ParseIntPipe) userId: number,
-    @Param('parentId', ParseIntPipe) parentId: number,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('parentId', ParseUUIDPipe) parentId: string,
     @Body() createPostDto: CreatePostDto,
   ): Promise<ResponseFromService> {
     const sharePost = await this.postService.createSharePost({
@@ -89,6 +89,7 @@ export class PostController {
       userId,
       parentId,
     });
+
     return {
       message: 'Share post created successfully',
       data: sharePost,
@@ -106,6 +107,7 @@ export class PostController {
   })
   async findPosts(): Promise<ResponseFromService> {
     const posts = await this.postService.findPosts();
+
     return {
       message: 'Post retrived succussfully',
       data: posts,
@@ -122,9 +124,10 @@ export class PostController {
     type: CommonResponse,
   })
   async findPostById(
-    @Param('postId', ParseIntPipe) postId: number,
+    @Param('postId', ParseUUIDPipe) postId: string,
   ): Promise<ResponseFromService> {
     const post = await this.postService.findPostById(postId);
+
     return {
       message: 'Post retrived succussfully',
       data: post,
@@ -141,9 +144,10 @@ export class PostController {
     type: CommonResponse,
   })
   async findPostByUser(
-    @Param('userId', ParseIntPipe) userId: number,
+    @Param('userId', ParseUUIDPipe) userId: string,
   ): Promise<ResponseFromService> {
     const posts = await this.postService.findPostByUser(userId);
+
     return {
       message: 'Post retrived succussfully',
       data: posts,
@@ -180,7 +184,7 @@ export class PostController {
   })
   async updatePost(
     @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
-    @Param('postId', ParseIntPipe) postId: number,
+    @Param('postId', ParseUUIDPipe) postId: string,
     @Body() updatePostDto: UpdatePostDto,
   ): Promise<ResponseFromService> {
     const post = await this.postService.updatePost(
@@ -190,6 +194,7 @@ export class PostController {
       },
       files,
     );
+
     return {
       message: 'Post updated successfully',
       data: post,
@@ -206,9 +211,10 @@ export class PostController {
     type: CommonResponse,
   })
   async deletePost(
-    @Param('postId', ParseIntPipe) postId: number,
+    @Param('postId', ParseUUIDPipe) postId: string,
   ): Promise<ResponseFromService> {
     await this.postService.deletePost(postId);
+
     return {
       message: 'Post deleted successfully',
     }
@@ -224,9 +230,10 @@ export class PostController {
     type: CommonResponse,
   })
   async deleteFile(
-    @Param('fileId', ParseIntPipe) fileId: number,
+    @Param('fileId', ParseUUIDPipe) fileId: string,
   ): Promise<ResponseFromService> {
     await this.postService.deleteFile(fileId);
+    
     return {
       message: 'File deleted successfully',
     }

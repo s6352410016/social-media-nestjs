@@ -3,7 +3,6 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
-  InternalServerErrorException,
   Post,
   Request,
   Response,
@@ -37,7 +36,15 @@ export class EmailController {
     @Response({ passthrough: true })
     res: ExpressResponse,
   ): Promise<ResponseFromService> {
-    return await this.emailService.sendEmail(sendEmailDto, res);
+    const { result, token } = await this.emailService.sendEmail(
+      sendEmailDto,
+      res,
+    );
+
+    setCookies('forgot_password_token', token, res);
+    return {
+      message: `Email send to ${result.accepted[0]} successfully`,
+    };
   }
 
   @UseGuards(ForgotPasswordAuthGuard)
@@ -53,32 +60,20 @@ export class EmailController {
     @Response({ passthrough: true })
     res: ExpressResponse,
   ): Promise<ResponseFromService> {
-    const result = await this.emailService.verifyOtp(
-      {
-        ...verifyOtpDto,
-        email: (
-          req.user as JwtPayload<{
-            email: string;
-          }>
-        ).email,
-      },
-    );
+    const token = await this.emailService.verifyOtp({
+      ...verifyOtpDto,
+      email: (
+        req.user as JwtPayload<{
+          email: string;
+        }>
+      ).email,
+    });
 
-    if(result.message && !result.token){
-      return {
-        message: result.message,
-      };
-    }
+    setCookies('reset_password_token', token, res);
+    res.clearCookie('forgot_password_token');
 
-    if (result.token && !result.message) {
-      setCookies('reset_password_token', result.token, res);
-      res.clearCookie('forgot_password_token');
-
-      return {
-        message: 'Otp verified successfully',
-      };
-    }
-
-    throw new InternalServerErrorException('Something went wrong');
+    return {
+      message: 'Otp verified successfully',
+    };
   }
 }

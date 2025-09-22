@@ -25,6 +25,7 @@ import { FileDir } from 'src/utils/types';
 import { NotificationService } from 'src/notification/notification.service';
 import { createNotifications } from 'src/utils/helpers/create-notifications';
 import { createNotification } from 'src/utils/helpers/create-notification';
+import { UserService } from 'src/user/user.service';
 import { Express } from 'express';
 
 @Injectable()
@@ -36,6 +37,7 @@ export class PostService {
     private configService: ConfigService,
     private prismaService: PrismaService,
     private notificationService: NotificationService,
+    private userService: UserService,
   ) {
     this.s3 = new S3Client({
       region: configServiceParam.get<string>('AWS_BUCKET_REGION')!,
@@ -49,7 +51,7 @@ export class PostService {
   }
 
   async createPost(
-    createPostDto: CreatePostDto & { userId: number },
+    createPostDto: CreatePostDto & { userId: string },
     files: Express.Multer.File[],
   ): Promise<
     Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
@@ -57,11 +59,16 @@ export class PostService {
     }
   > {
     const { message, userId } = createPostDto;
-    if (!userId) {
-      throw new BadRequestException('User id must not be equal to 0');
+    if (!message && (!files || !files.length)) {
+      throw new BadRequestException('Post must contain a message or files');
     }
 
     try {
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        throw new NotFoundException(`User id ${userId} not found`);
+      }
+
       const post = await this.prismaService.post.create({
         data: {
           message,
@@ -148,14 +155,16 @@ export class PostService {
   }
 
   async createSharePost(
-    createPostDto: CreatePostDto & { userId: number; parentId: number },
+    createPostDto: CreatePostDto & { userId: string; parentId: string },
   ): Promise<Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] }> {
     const { message, userId, parentId } = createPostDto;
-    if (!userId) {
-      throw new BadRequestException('User id must not be equal to 0');
-    }
 
     try {
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        throw new NotFoundException(`User id ${userId} not found`);
+      }
+
       const post = await this.prismaService.post.findUnique({
         where: {
           id: parentId,
@@ -245,15 +254,11 @@ export class PostService {
     }
   }
 
-  async findPostById(postId: number): Promise<
+  async findPostById(postId: string): Promise<
     Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
       filesUrl: string[];
     }
   > {
-    if (!postId) {
-      throw new BadRequestException('Post id must not be equal to 0');
-    }
-
     try {
       const post = await this.prismaService.post.findUnique({
         where: {
@@ -302,16 +307,17 @@ export class PostService {
     }
   }
 
-  async findPostByUser(userId: number): Promise<
+  async findPostByUser(userId: string): Promise<
     (Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
       filesUrl: string[];
     })[]
   > {
-    if (!userId) {
-      throw new BadRequestException('User id must not be equal to 0');
-    }
-
     try {
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        throw new NotFoundException(`User id ${userId} not found`);
+      }
+
       const posts = await this.prismaService.post.findMany({
         where: {
           userId,
@@ -365,7 +371,7 @@ export class PostService {
   }
 
   async updatePost(
-    updatePostDto: UpdatePostDto & { postId: number },
+    updatePostDto: UpdatePostDto & { postId: string },
     files?: Express.Multer.File[],
   ): Promise<
     Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
@@ -373,8 +379,8 @@ export class PostService {
     }
   > {
     const { message, postId } = updatePostDto;
-    if (!postId) {
-      throw new BadRequestException('Post id must not be equal to 0');
+    if (!message && (!files || !files.length)) {
+      throw new BadRequestException('Post must contain a message or files');
     }
 
     try {
@@ -516,11 +522,11 @@ export class PostService {
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
-      } else if (error instanceof BadRequestException) {
-        throw error;
-      } else if (error instanceof NotFoundException) {
-        throw error;
-      } else if (error instanceof UnprocessableEntityException) {
+      } else if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof UnprocessableEntityException
+      ) {
         throw error;
       }
 
@@ -528,11 +534,7 @@ export class PostService {
     }
   }
 
-  async deletePost(postId: number) {
-    if (!postId) {
-      throw new BadRequestException('Post id must not be equal to 0');
-    }
-
+  async deletePost(postId: string) {
     try {
       const post = await this.prismaService.post.findUnique({
         where: {
@@ -583,11 +585,7 @@ export class PostService {
     }
   }
 
-  async deleteFile(fileId: number) {
-    if (!fileId) {
-      throw new BadRequestException('File id must not be equal to 0');
-    }
-
+  async deleteFile(fileId: string) {
     try {
       const file = await this.prismaService.file.findUnique({
         where: {
@@ -628,9 +626,10 @@ export class PostService {
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
-      } else if (error instanceof NotFoundException) {
-        throw error;
-      } else if (error instanceof BadRequestException) {
+      } else if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
 

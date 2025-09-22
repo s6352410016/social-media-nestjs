@@ -107,7 +107,7 @@ export class UserService {
   }
 
   async findById(
-    id: number,
+    id: string,
   ): Promise<
     (Omit<User, 'passwordHash'> & { provider: Provider | null }) | null
   > {
@@ -173,7 +173,7 @@ export class UserService {
   }
 
   async findByFullname(
-    currentId: number,
+    currentId: string,
     query: string,
   ): Promise<(Omit<User, 'passwordHash'> & { provider: Provider | null })[]> {
     return this.prisma.user.findMany({

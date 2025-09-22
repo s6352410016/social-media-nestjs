@@ -3,7 +3,7 @@ import { NotificationService } from 'src/notification/notification.service';
 
 export function createNotification(
   notificationService: NotificationService,
-  activeUserId: number,
+  activeUserId: string,
   post: Post,
 ) {
   if (activeUserId !== post.userId) {

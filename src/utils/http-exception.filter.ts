@@ -28,7 +28,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       status,
       success: false,
-      message: exception.cause || exceptionMessages || 'Error something went wrong',
+      message: exceptionMessages || 'Error something went wrong',
     } satisfies CommonResponse);
   }
 }
