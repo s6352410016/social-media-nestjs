@@ -37,6 +37,7 @@ export class NotificationService {
   }
 
   async findPagination(
+    activeUserId: string,
     cursor?: string,
     limit: number = 5,
   ): Promise<{
@@ -44,6 +45,15 @@ export class NotificationService {
     nextCursor: string | null;
   }> {
     const notifies = await this.prismaService.notification.findMany({
+      where: {
+        senderId: {
+          not: {
+            equals: activeUserId,
+          },
+        },
+        receiverId: activeUserId,
+        isRead: false,
+      },
       take: -(limit + 1),
       cursor: cursor
         ? {
