@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
-import { ContentType, Like, Post, User } from 'generated/prisma';
+import { ContentType, Like, Notification, Post, User } from 'generated/prisma';
 import { createFileRecords } from 'src/utils/helpers/create-file-records';
 import { putObjectS3 } from 'src/utils/helpers/put-object-s3';
 import { getObjectS3 } from 'src/utils/helpers/get-object-s3';
@@ -26,6 +26,7 @@ import { NotificationService } from 'src/notification/notification.service';
 import { createNotifications } from 'src/utils/helpers/create-notifications';
 import { createNotification } from 'src/utils/helpers/create-notification';
 import { UserService } from 'src/user/user.service';
+import { NotificationGateway } from 'src/notification/notification.gateway';
 import { Express } from 'express';
 
 @Injectable()
@@ -38,6 +39,7 @@ export class PostService {
     private prismaService: PrismaService,
     private notificationService: NotificationService,
     private userService: UserService,
+    private notificationGateway: NotificationGateway,
   ) {
     this.s3 = new S3Client({
       region: configServiceParam.get<string>('AWS_BUCKET_REGION')!,
@@ -59,6 +61,7 @@ export class PostService {
     }
   > {
     const { message, userId } = createPostDto;
+    let notifications: (Notification & { sender: Omit<User, 'passwordHash'> })[];
     if (!message && (!files || !files.length)) {
       throw new BadRequestException('Post must contain a message or files');
     }
@@ -85,12 +88,13 @@ export class PostService {
       });
 
       if (!files || !files.length) {
-        await createNotifications(
+        notifications = await createNotifications(
           this.prismaService,
           this.notificationService,
           userId,
           post.id,
         );
+        this.notificationGateway.sendNotifications(notifications);
 
         return post;
       }
@@ -129,12 +133,13 @@ export class PostService {
         await this.prismaService.file.createMany({
           data: postFileRecords,
         });
-        await createNotifications(
+        notifications = await createNotifications(
           this.prismaService,
           this.notificationService,
           userId,
           post.id,
         );
+        this.notificationGateway.sendNotifications(notifications);
 
         return {
           ...post,
@@ -189,7 +194,10 @@ export class PostService {
           },
         },
       });
-      await createNotification(this.notificationService, userId, post);
+      const notification = await createNotification(this.notificationService, userId, post);
+      if(notification){
+        this.notificationGateway.sendNotifications(notification);
+      }
 
       return sharePost;
     } catch (error: unknown) {

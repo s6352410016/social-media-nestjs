@@ -12,6 +12,13 @@ export class NotificationService {
     try {
       return this.prismaService.notification.create({
         data: createNotificationDto,
+        include: {
+          sender: {
+            omit: {
+              passwordHash: true,
+            },
+          },
+        },
       });
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
@@ -22,11 +29,26 @@ export class NotificationService {
     }
   }
 
-  createMany(createNotificationDto: CreateNotificationDto[]) {
+  async createMany(createNotificationDto: CreateNotificationDto[]) {
     try {
-      return this.prismaService.notification.createMany({
-        data: createNotificationDto,
-      });
+      const notifications =
+        await this.prismaService.notification.createManyAndReturn({
+          data: createNotificationDto,
+        });
+      const notificationsWithSender =
+        await this.prismaService.notification.findMany({
+          where: {
+            id: { in: notifications.map((notification) => notification.id) },
+          },
+          include: {
+            sender: {
+              omit: {
+                passwordHash: true,
+              },
+            },
+          },
+        });
+      return notificationsWithSender;  
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
