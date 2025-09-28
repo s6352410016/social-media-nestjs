@@ -1,8 +1,12 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
-import { Notification } from 'generated/prisma';
+import { Notification, User } from 'generated/prisma';
 
 @Injectable()
 export class NotificationService {
@@ -48,7 +52,7 @@ export class NotificationService {
             },
           },
         });
-      return notificationsWithSender;  
+      return notificationsWithSender;
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
@@ -74,7 +78,6 @@ export class NotificationService {
           },
         },
         receiverId: activeUserId,
-        isRead: false,
       },
       take: -(limit + 1),
       cursor: cursor
@@ -105,5 +108,48 @@ export class NotificationService {
       notifies,
       nextCursor,
     };
+  }
+
+  async updateToRead(
+    notificationId: string,
+  ): Promise<Notification & { sender: Omit<User, 'passwordHash'> }> {
+    try {
+      const notification = await this.prismaService.notification.findUnique({
+        where: {
+          id: notificationId,
+        },
+      });
+      if (!notification) {
+        throw new NotFoundException(
+          `Notification of id ${notificationId} not found`,
+        );
+      }
+
+      return this.prismaService.notification.update({
+        where: {
+          id: notification.id,
+        },
+        data: {
+          isRead: true,
+        },
+        include: {
+          sender: {
+            omit: {
+              passwordHash: true,
+            },
+          },
+        },
+      });
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(
+          'Error cannot update notification something went wrong',
+        );
+      } else if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
   }
 }

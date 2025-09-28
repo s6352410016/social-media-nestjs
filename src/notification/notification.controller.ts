@@ -1,8 +1,10 @@
 import {
   Controller,
   Get,
+  Param,
   ParseIntPipe,
   ParseUUIDPipe,
+  Patch,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -42,6 +44,24 @@ export class NotificationController {
     return {
       message: 'Notifications retreived successfully',
       data: notifies,
+    }
+  }
+
+  @Patch('update/read/:notificationId')
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: CommonResponse,
+  })
+  @ApiOkResponse({
+    description: 'Notifications updated successfully',
+    type: CommonResponse,
+  })
+  async read(@Param('notificationId', ParseUUIDPipe) notificationId: string): Promise<ResponseFromService> {
+    const updateResult = await this.notificationService.updateToRead(notificationId);
+    
+    return {
+      message: 'Notifications updated successfully',
+      data: updateResult,
     }
   }
 }

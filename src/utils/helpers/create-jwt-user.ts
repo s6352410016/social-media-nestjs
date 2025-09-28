@@ -24,7 +24,7 @@ export async function createJwtUser(
       },
       {
         secret: configService.get<string>('RT_SECRET'),
-        expiresIn: '1h',
+        expiresIn: '3d',
       },
     ),
   ]);
