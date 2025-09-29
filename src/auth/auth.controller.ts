@@ -142,6 +142,10 @@ export class AuthController {
     );
     return {
       message: 'Tokens refreshed successfully',
+      data: {
+        accessToken,
+        refreshToken,
+      },
     }
   }
 
