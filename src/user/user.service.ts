@@ -173,19 +173,27 @@ export class UserService {
   }
 
   async findByFullname(
-    currentId: string,
+    activeUserId: string,
     query: string,
-  ): Promise<(Omit<User, 'passwordHash'> & { provider: Provider | null })[]> {
-    return this.prisma.user.findMany({
+    cursor?: string,
+    limit: number = 5,
+  ): Promise<{users: (Omit<User, 'passwordHash'> & { provider: Provider | null })[]; nextCursor: string | null;}> {
+    const users = await this.prisma.user.findMany({
       where: {
         fullname: {
           contains: query,
           mode: 'insensitive',
         },
         id: {
-          not: currentId,
+          not: activeUserId,
         },
       },
+      take: limit + 1,
+      cursor: cursor
+        ? {
+            id: cursor,
+          }
+        : undefined,
       omit: {
         passwordHash: true,
       },
@@ -193,5 +201,87 @@ export class UserService {
         provider: true,
       },
     });
+
+    let nextCursor: string | null = null;
+
+    if (users.length > limit) {
+      const nextItem = users.pop();
+      nextCursor = nextItem!.id;
+    }
+
+    return {
+      users,
+      nextCursor,
+    };
+  }
+
+  async findMany(
+    activeUserId: string,
+    cursor?: string,
+    limit: number = 5,
+  ): Promise<{
+    users: (Omit<User, 'passwordHash'> & { provider: Provider | null })[];
+    nextCursor: string | null;
+  }> {
+    try {
+      const activeUser = await this.prisma.user.findUnique({
+        where: {
+          id: activeUserId,
+        },
+      });
+      if (!activeUser) {
+        throw new NotFoundException(
+          `Active user by user id ${activeUserId} not found`,
+        );
+      }
+
+      const users = await this.prisma.user.findMany({
+        where: {
+          id: {
+            not: {
+              equals: activeUserId,
+            },
+          },
+        },
+        take: -(limit + 1),
+        cursor: cursor
+          ? {
+              id: cursor,
+            }
+          : undefined,
+        include: {
+          provider: true,
+        },
+        omit: {
+          passwordHash: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      let nextCursor: string | null = null;
+
+      if (users.length > limit) {
+        const nextItem = users.shift();
+        nextCursor = nextItem!.id;
+      }
+
+      return {
+        users,
+        nextCursor,
+      };
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(
+          error,
+          'Error something went wrong',
+        );
+      } else if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
   }
 }

@@ -19,7 +19,7 @@ import { ResponseFromService } from 'src/utils/types';
 export class NotificationController {
   constructor(private notificationService: NotificationService) {}
 
-  @Get('finds')
+  @Get('finds/:activeUserId')
   @ApiQuery({ name: 'cursor', required: false, type: String })
   @ApiQuery({ name: 'limit', required: false, type: String })
   @ApiUnauthorizedResponse({
@@ -31,7 +31,7 @@ export class NotificationController {
     type: CommonResponse,
   })
   async findNotifications(
-    @Query('activeUserId', ParseUUIDPipe) activeUserId: string,
+    @Param('activeUserId', ParseUUIDPipe) activeUserId: string,
     @Query('cursor', new ParseUUIDPipe({ optional: true })) cursor?: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ): Promise<ResponseFromService> {

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Patch,
   Query,
@@ -10,7 +11,11 @@ import {
   Response,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiQuery,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { ResetPasswordAuthGuard } from 'src/auth/guards/reset-password-auth.guard';
 import { CommonResponse } from 'src/utils/swagger/common-response';
 import { UserService } from './user.service';
@@ -41,25 +46,25 @@ export class UserController {
     @Response({ passthrough: true }) res: ExpressResponse,
     @Body() resetPasswordDto: ResetPasswordDto,
   ): Promise<ResponseFromService> {
-    await this.userService.resetPassword(
-      {
-        ...resetPasswordDto,
-        email: (
-          req.user as JwtPayload<{
-            email: string;
-          }>
-        ).email,
-      },
-    );
+    await this.userService.resetPassword({
+      ...resetPasswordDto,
+      email: (
+        req.user as JwtPayload<{
+          email: string;
+        }>
+      ).email,
+    });
 
     res.clearCookie('reset_password_token');
     return {
       message: 'Reset password successfully',
-    }
+    };
   }
 
   @UseGuards(AtAuthGuard)
-  @Get('find-by-fullname/:currentId')
+  @Get('find-by-fullname/:activeUserId')
+  @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: String })
   @ApiUnauthorizedResponse({
     description: 'Unauthorized',
     type: CommonResponse,
@@ -69,14 +74,46 @@ export class UserController {
     type: CommonResponse,
   })
   async findByFullname(
-    @Param('currentId', ParseUUIDPipe) currentId: string,
+    @Param('activeUserId', ParseUUIDPipe) activeUserId: string,
     @Query('fullname') fullname: string,
+    @Query('cursor', new ParseUUIDPipe({ optional: true })) cursor?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ): Promise<ResponseFromService> {
-    const users = await this.userService.findByFullname(currentId, fullname);
-    
+    const users = await this.userService.findByFullname(
+      activeUserId,
+      fullname,
+      cursor,
+      limit,
+    );
+
     return {
       message: 'Users retreived successfully',
       data: users,
-    }
+    };
+  }
+
+  @UseGuards(AtAuthGuard)
+  @Get('finds/:activeUserId')
+  @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: String })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: CommonResponse,
+  })
+  @ApiOkResponse({
+    description: 'Users retreived successfully',
+    type: CommonResponse,
+  })
+  async findUsers(
+    @Param('activeUserId', ParseUUIDPipe) activeUserId: string,
+    @Query('cursor', new ParseUUIDPipe({ optional: true })) cursor?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ): Promise<ResponseFromService> {
+    const users = await this.userService.findMany(activeUserId, cursor, limit);
+
+    return {
+      message: 'Users retreived successfully',
+      data: users,
+    };
   }
 }
