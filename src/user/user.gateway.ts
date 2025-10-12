@@ -4,11 +4,11 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Provider, User } from 'generated/prisma';
+import { User } from 'generated/prisma';
 import { Server } from 'socket.io';
 
 interface ServerToClientEvents {
-  usersActive: (users: (Omit<User, 'passwordHash'> & { provider: Provider })[] ) => void;
+  usersActive: (users: Omit<User, 'passwordHash'>[] ) => void;
 }
 
 @WebSocketGateway({
@@ -21,12 +21,12 @@ export class UserGateway {
   @WebSocketServer()
   private server: Server<any, ServerToClientEvents>;
 
-  private users: (Omit<User, 'passwordHash'> & { provider: Provider })[] = [];
+  private users: Omit<User, 'passwordHash'>[] = [];
 
   @SubscribeMessage('connected')
   connected(
     @MessageBody()
-    activeUser: Omit<User, 'passwordHash'> & { provider: Provider },
+    activeUser: Omit<User, 'passwordHash'>,
   ) {
     if(!(this.users.some((user) => user.id === activeUser.id))){
       this.users.push(activeUser);

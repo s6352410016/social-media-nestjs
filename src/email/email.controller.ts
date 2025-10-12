@@ -38,7 +38,6 @@ export class EmailController {
   ): Promise<ResponseFromService> {
     const { result, token } = await this.emailService.sendEmail(
       sendEmailDto,
-      res,
     );
 
     setCookies('forgot_password_token', token, res);

@@ -4,7 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { Provider, ProviderType, User } from 'generated/prisma';
+import { NotificationType, ProviderType, User } from 'generated/prisma';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
@@ -12,36 +12,30 @@ import { hashSecret } from 'src/utils/helpers/hash-secret';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CreateSocialUserDto } from 'src/utils/types';
 import { formatString } from 'src/utils/helpers/format-string';
+import { NotificationService } from 'src/notification/notification.service';
+import { NotificationGateway } from 'src/notification/notification.gateway';
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationService: NotificationService,
+    private notificationGateway: NotificationGateway,
+  ) {}
 
-  async findOne(
-    username: string,
-  ): Promise<(User & { provider: Provider | null }) | null> {
+  async findOne(username: string): Promise<User | null> {
     return await this.prisma.user.findUnique({
       where: {
         username,
-      },
-      include: {
-        provider: true,
       },
     });
   }
 
   async createUser(
     createUserDto: CreateUserDto | CreateSocialUserDto,
-  ): Promise<Omit<User, 'passwordHash'> & { provider: Provider | null }> {
-    const {
-      fullname,
-      username,
-      email,
-      password,
-      profileUrl,
-      providerType,
-      providerId,
-    } = createUserDto;
+  ): Promise<Omit<User, 'passwordHash'>> {
+    const { fullname, username, email, password, profileUrl, providerType } =
+      createUserDto;
     try {
       if (
         providerType === ProviderType.GOOGLE ||
@@ -52,18 +46,10 @@ export class UserService {
             fullname,
             email,
             profileUrl,
-            provider: {
-              create: {
-                providerType,
-                providerId,
-              },
-            },
+            providerType,
           },
           omit: {
             passwordHash: true,
-          },
-          include: {
-            provider: true,
           },
         });
       }
@@ -76,17 +62,10 @@ export class UserService {
             username,
             email,
             passwordHash,
-            provider: {
-              create: {
-                providerType,
-              },
-            },
+            providerType,
           },
           omit: {
             passwordHash: true,
-          },
-          include: {
-            provider: true,
           },
         });
       }
@@ -106,20 +85,13 @@ export class UserService {
     }
   }
 
-  async findById(
-    id: string,
-  ): Promise<
-    (Omit<User, 'passwordHash'> & { provider: Provider | null }) | null
-  > {
+  async findById(id: string): Promise<Omit<User, 'passwordHash'> | null> {
     return await this.prisma.user.findUnique({
       where: {
         id,
       },
       omit: {
         passwordHash: true,
-      },
-      include: {
-        provider: true,
       },
     });
   }
@@ -154,20 +126,13 @@ export class UserService {
     }
   }
 
-  async findByEmail(
-    email: string,
-  ): Promise<
-    (Omit<User, 'passwordHash'> & { provider: Provider | null }) | null
-  > {
+  async findByEmail(email: string): Promise<Omit<User, 'passwordHash'> | null> {
     return await this.prisma.user.findUnique({
       where: {
         email,
       },
       omit: {
         passwordHash: true,
-      },
-      include: {
-        provider: true,
       },
     });
   }
@@ -177,7 +142,10 @@ export class UserService {
     query: string,
     cursor?: string,
     limit: number = 5,
-  ): Promise<{users: (Omit<User, 'passwordHash'> & { provider: Provider | null })[]; nextCursor: string | null;}> {
+  ): Promise<{
+    users: Omit<User, 'passwordHash'>[];
+    nextCursor: string | null;
+  }> {
     const users = await this.prisma.user.findMany({
       where: {
         fullname: {
@@ -196,9 +164,6 @@ export class UserService {
         : undefined,
       omit: {
         passwordHash: true,
-      },
-      include: {
-        provider: true,
       },
     });
 
@@ -220,7 +185,7 @@ export class UserService {
     cursor?: string,
     limit: number = 5,
   ): Promise<{
-    users: (Omit<User, 'passwordHash'> & { provider: Provider | null })[];
+    users: Omit<User, 'passwordHash'>[];
     nextCursor: string | null;
   }> {
     try {
@@ -249,9 +214,6 @@ export class UserService {
               id: cursor,
             }
           : undefined,
-        include: {
-          provider: true,
-        },
         omit: {
           passwordHash: true,
         },
@@ -271,6 +233,74 @@ export class UserService {
         users,
         nextCursor,
       };
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(
+          error,
+          'Error something went wrong',
+        );
+      } else if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  async follow(followerId: string, followingId: string) {
+    try {
+      const followerUser = await this.findById(followerId);
+      if (!followerUser) {
+        throw new NotFoundException(`Follower user id ${followerId} not found`);
+      }
+
+      const followingUser = await this.findById(followingId);
+      if (!followingUser) {
+        throw new NotFoundException(
+          `Following user id ${followingId} not found`,
+        );
+      }
+
+      const followed = await this.prisma.follower.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId,
+            followingId,
+          },
+        },
+      });
+      if (!followed) {
+        await this.prisma.follower.create({
+          data: {
+            followerId,
+            followingId,
+          },
+        });
+
+        const notification = await this.notificationService.create({
+          type: NotificationType.FOLLOW,
+          senderId: followerId,
+          receiverId: followingId,
+          message: 'Following you',
+        });
+        this.notificationGateway.sendNotifications(notification);
+
+        return 'Followed successfully';
+      }
+
+      await this.prisma.follower.delete({
+        where: {
+          followerId_followingId: {
+            followerId,
+            followingId,
+          },
+        },
+      });
+
+      const notification = await this.notificationService.findByUser(followerId, followingId);
+      await this.notificationService.delete(notification.id);
+
+      return 'Unfollow successfully';
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(

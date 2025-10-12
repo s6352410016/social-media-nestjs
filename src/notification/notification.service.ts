@@ -152,4 +152,55 @@ export class NotificationService {
       throw new InternalServerErrorException(error, 'Unexpected error');
     }
   }
+
+  async findByUser(
+    followerId: string,
+    followingId: string,
+  ): Promise<Notification> {
+    try {
+      const notification = await this.prismaService.notification.findFirst({
+        where: {
+          senderId: followerId,
+          receiverId: followingId,
+        },
+      });
+      if (!notification) {
+        throw new NotFoundException(
+          `Notification from followerId ${followerId} and followingId ${followingId} not found`,
+        );
+      }
+
+      return notification;
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(
+          error,
+          'Error something went wrong',
+        );
+      } else if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  delete(notificationId: string) {
+    try {
+      return this.prismaService.notification.delete({
+        where: {
+          id: notificationId,
+        },
+      });
+    } catch (error: unknown) {
+      if (error instanceof PrismaClientKnownRequestError) {
+        throw new InternalServerErrorException(
+          error,
+          'Error something went wrong',
+        );
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
 }

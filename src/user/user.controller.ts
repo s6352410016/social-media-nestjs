@@ -2,10 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
   Patch,
+  Post,
   Query,
   Request,
   Response,
@@ -115,5 +118,27 @@ export class UserController {
       message: 'Users retreived successfully',
       data: users,
     };
+  }
+
+  // @UseGuards(AtAuthGuard)
+  @Post('follow/:followerId/:followingId')
+  @HttpCode(HttpStatus.OK)
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized',
+    type: CommonResponse,
+  })
+  @ApiOkResponse({
+    description: 'Follow action success',
+    type: CommonResponse,
+  })
+  async follow(
+    @Param('followerId', ParseUUIDPipe) followerId: string,
+    @Param('followingId', ParseUUIDPipe) followingId: string,
+  ): Promise<ResponseFromService>{
+    const message = await this.userService.follow(followerId, followingId);
+
+    return {
+      message,
+    }
   }
 }

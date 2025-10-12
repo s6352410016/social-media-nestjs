@@ -43,14 +43,14 @@ export class EmailService {
     });
   }
 
-  async sendEmail(sendEmailDto: SendEmailDto, res: ExpressResponse) {
+  async sendEmail(sendEmailDto: SendEmailDto) {
     const { email } = sendEmailDto;
     const user = await this.userService.findByEmail(email);
     if (!user) {
       throw new NotFoundException(`Email ${email} not found`);
     }
 
-    const providerTypeUser = user.provider?.providerType;
+    const providerTypeUser = user.providerType;
     if (
       providerTypeUser === ProviderType.GOOGLE ||
       providerTypeUser === ProviderType.GITHUB

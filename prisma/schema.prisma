@@ -49,41 +49,30 @@ enum NotificationType {
 }
 
 model User {
-  id                   String    @id @default(uuid())
+  id                   String       @id @default(uuid())
   fullname             String
-  username             String?   @unique
-  email                String    @unique
-  passwordHash         String?   @map("password_hash")
-  dateOfBirth          DateTime? @map("date_of_birth")
-  profileUrl           String?   @map("profile_url")
-  profileBackgroundUrl String?   @map("profile_background_url")
+  username             String?      @unique
+  email                String       @unique
+  passwordHash         String?      @map("password_hash")
+  dateOfBirth          DateTime?    @map("date_of_birth")
+  profileUrl           String?      @map("profile_url")
+  profileBackgroundUrl String?      @map("profile_background_url")
   info                 String?
-  role                 Role      @default(USER)
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  role                 Role         @default(USER)
+  providerType         ProviderType @default(LOCAL) @map("provider_type")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
 
-  provider              Provider?
   otp                   Otp?
   posts                 Post[]
   comments              Comment[]
   likes                 Like[]
   senderNotifications   Notification[] @relation("SenderNotifications")
   receiverNotifications Notification[] @relation("ReceiverNotifications")
+  followers             Follower[]     @relation("followers")
+  following             Follower[]     @relation("following")
 
   @@map("users")
-}
-
-model Provider {
-  id           Int          @id @default(autoincrement())
-  providerType ProviderType @default(LOCAL) @map("provider_type")
-  providerId   String?      @unique @map("provider_id")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String @unique @map("user_id")
-
-  @@map("providers")
 }
 
 model Otp {
@@ -147,13 +136,13 @@ model File {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  contentId   String         @map("content_id")
+  contentId   String      @map("content_id")
   contentType ContentType @map("content_type")
 
   @@unique([contentId, contentType, fileUrl])
   @@map("files")
 }
- 
+
 model Like {
   id     Int    @id @default(autoincrement())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -191,4 +180,18 @@ model Notification {
   comment  Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model Follower {
+  id          Int      @id @default(autoincrement())
+  followerId  String   @map("follower_id")
+  followingId String   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  follower  User @relation("following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("followers")
 }

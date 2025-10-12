@@ -35,8 +35,4 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(ProviderType)
   providerType?: ProviderType = ProviderType.LOCAL;
-
-  @IsOptional()
-  @IsString()
-  providerId?: string;
 }

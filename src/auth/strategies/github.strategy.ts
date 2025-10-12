@@ -23,8 +23,6 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     done: VerifyCallback,
   ) {
     const user = {
-      provider: profile.provider,
-      providerId: profile.id,
       email: profile.emails?.[0].value!,
       name: profile.displayName! || profile.username!,
       avatar: profile.photos?.[0].value!,

@@ -7,8 +7,6 @@ export type JwtPayload<T extends object = {}> = {
 } & T;
 
 export interface ISocialUserPayload {
-  provider: string;
-  providerId: string;
   email: string;
   name: string;
   avatar: string;

@@ -24,7 +24,7 @@ export class AuthService {
     const user = await this.userService.findOne(username);
     if (
       user &&
-      user.provider?.providerType === ProviderType.LOCAL &&
+      user.providerType === ProviderType.LOCAL &&
       user.passwordHash &&
       (await bcrypt.compare(password, user.passwordHash))
     ) {
@@ -60,7 +60,7 @@ export class AuthService {
     // กรณีที่ผู้ใช้มีอยู่แล้ว
     if (providerType === ProviderType.GOOGLE && userExist) {
       //กรณี provider ไม่ตรง
-      if (userExist.provider?.providerType !== ProviderType.GOOGLE) {
+      if (userExist.providerType !== ProviderType.GOOGLE) {
         const token = await createJwt(
           {
             socialAuthVerified: true,
@@ -87,7 +87,7 @@ export class AuthService {
       };
     } else if (providerType === ProviderType.GITHUB && userExist) {
       //กรณี provider ไม่ตรง
-      if (userExist.provider?.providerType !== ProviderType.GITHUB) {
+      if (userExist.providerType !== ProviderType.GITHUB) {
         const token = await createJwt(
           {
             socialAuthVerified: true,
@@ -118,7 +118,6 @@ export class AuthService {
         fullname: user.name,
         email: user.email,
         providerType,
-        providerId: user.providerId,
         profileUrl: user.avatar,
       };
       const userData = await this.userService.createUser(createSocialUserDto);
