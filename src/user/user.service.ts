@@ -4,7 +4,12 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType, ProviderType, User } from 'generated/prisma';
+import {
+  Follower,
+  NotificationType,
+  ProviderType,
+  User,
+} from 'generated/prisma';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
@@ -185,7 +190,9 @@ export class UserService {
     cursor?: string,
     limit: number = 5,
   ): Promise<{
-    users: Omit<User, 'passwordHash'>[];
+    users: (Omit<User, 'passwordHash'> & {
+      followers: Follower[];
+    })[];
     nextCursor: string | null;
   }> {
     try {
@@ -217,6 +224,9 @@ export class UserService {
         omit: {
           passwordHash: true,
         },
+        include: {
+          followers: true,
+        },
         orderBy: {
           createdAt: 'desc',
         },
@@ -247,7 +257,19 @@ export class UserService {
     }
   }
 
-  async follow(followerId: string, followingId: string) {
+  async follow(
+    followerId: string,
+    followingId: string,
+  ): Promise<{
+    status: 'follow' | 'unfollow';
+    follower: {
+      id: number;
+      followerId: string;
+      followingId: string;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+  }> {
     try {
       const followerUser = await this.findById(followerId);
       if (!followerUser) {
@@ -270,7 +292,7 @@ export class UserService {
         },
       });
       if (!followed) {
-        await this.prisma.follower.create({
+        const follower = await this.prisma.follower.create({
           data: {
             followerId,
             followingId,
@@ -285,10 +307,13 @@ export class UserService {
         });
         this.notificationGateway.sendNotifications(notification);
 
-        return 'Followed successfully';
+        return {
+          status: 'follow',
+          follower,
+        };
       }
 
-      await this.prisma.follower.delete({
+      const follower = await this.prisma.follower.delete({
         where: {
           followerId_followingId: {
             followerId,
@@ -297,10 +322,16 @@ export class UserService {
         },
       });
 
-      const notification = await this.notificationService.findByUser(followerId, followingId);
+      const notification = await this.notificationService.findByUser(
+        followerId,
+        followingId,
+      );
       await this.notificationService.delete(notification.id);
 
-      return 'Unfollow successfully';
+      return {
+        status: 'unfollow',
+        follower,
+      };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(

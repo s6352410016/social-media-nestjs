@@ -120,7 +120,7 @@ export class UserController {
     };
   }
 
-  // @UseGuards(AtAuthGuard)
+  @UseGuards(AtAuthGuard)
   @Post('follow/:followerId/:followingId')
   @HttpCode(HttpStatus.OK)
   @ApiUnauthorizedResponse({
@@ -128,17 +128,20 @@ export class UserController {
     type: CommonResponse,
   })
   @ApiOkResponse({
-    description: 'Follow action success',
+    description: 'Follow action successfully',
     type: CommonResponse,
   })
   async follow(
     @Param('followerId', ParseUUIDPipe) followerId: string,
     @Param('followingId', ParseUUIDPipe) followingId: string,
   ): Promise<ResponseFromService>{
-    const message = await this.userService.follow(followerId, followingId);
+    const follower = await this.userService.follow(followerId, followingId);
 
     return {
-      message,
+      message: `${follower.status === 'follow' ? 'Follow' : 'Unfollow'} action successfully`,
+      data: {
+        follower: follower.follower,
+      },
     }
   }
 }
