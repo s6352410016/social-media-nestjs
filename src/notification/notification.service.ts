@@ -156,12 +156,19 @@ export class NotificationService {
   async findByUser(
     followerId: string,
     followingId: string,
-  ): Promise<Notification> {
+  ) {
     try {
       const notification = await this.prismaService.notification.findFirst({
         where: {
           senderId: followerId,
           receiverId: followingId,
+        },
+        include: {
+          sender: {
+            omit: {
+              passwordHash: true,
+            },
+          },
         },
       });
       if (!notification) {

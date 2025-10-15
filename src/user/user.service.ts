@@ -327,6 +327,7 @@ export class UserService {
         followingId,
       );
       await this.notificationService.delete(notification.id);
+      this.notificationGateway.sendNotifications(notification);
 
       return {
         status: 'unfollow',
