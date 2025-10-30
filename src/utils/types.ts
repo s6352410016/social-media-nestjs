@@ -34,3 +34,8 @@ export interface ResponseFromService {
   message: string;
   data?: Object | string | Array<any>;
 }
+
+export interface ICookieObject {
+  access_token: string;
+  refresh_token: string;
+}

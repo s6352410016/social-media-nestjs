@@ -1,6 +1,9 @@
+import { UseFilters, UseGuards } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
@@ -8,6 +11,10 @@ import {
 } from '@nestjs/websockets';
 import { User } from 'generated/prisma';
 import { Server, Socket } from 'socket.io';
+import { WsAuthGuard } from 'src/auth/guards/ws-auth.guard';
+import { handleWsConnection } from 'src/utils/helpers/handle-ws-connection';
+import { handleWsDisconnection } from 'src/utils/helpers/handle-ws-disconnection';
+import { WsAuthExceptionFilter } from 'src/utils/ws-auth-exception.filter';
 
 interface ServerToClientEvents {
   usersActive: (
@@ -15,13 +22,19 @@ interface ServerToClientEvents {
   ) => void;
 }
 
+@UseGuards(WsAuthGuard)
+@UseFilters(WsAuthExceptionFilter)
 @WebSocketGateway({
   cors: {
     origin: process.env.CLIENT_URL,
     credentials: true,
   },
 })
-export class UserGateway implements OnGatewayDisconnect {
+export class UserGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  constructor(private jwtService: JwtService) {}
+
+  private clients = new Map<string, Socket<any, ServerToClientEvents>>();
+
   @WebSocketServer()
   private server: Server<any, ServerToClientEvents>;
 
@@ -29,6 +42,10 @@ export class UserGateway implements OnGatewayDisconnect {
     socketClientId: string;
     active: boolean;
   })[] = [];
+
+  handleConnection(client: Socket) {
+    handleWsConnection(client, this.jwtService, this.clients);
+  }
 
   @SubscribeMessage('connected')
   connected(
@@ -53,9 +70,11 @@ export class UserGateway implements OnGatewayDisconnect {
       ({ socketClientId, ...others }) => others,
     );
     this.server.emit('usersActive', filterUsers);
-  }  
+  }
 
-  handleDisconnect(client: Socket<any, ServerToClientEvents>) { 
+  handleDisconnect(client: Socket<any, ServerToClientEvents>) {
+    handleWsDisconnection(client, this.clients);
+
     let userIdToDelete = '';
 
     const updateUsers = this.users.map(({ socketClientId, ...others }) => {

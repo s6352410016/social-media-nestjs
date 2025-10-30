@@ -305,7 +305,7 @@ export class UserService {
           receiverId: followingId,
           message: 'Following you',
         });
-        this.notificationGateway.sendNotifications(notification);
+        this.notificationGateway.sendNotifications(followingId, notification);
 
         return {
           status: 'follow',
@@ -327,7 +327,7 @@ export class UserService {
         followingId,
       );
       await this.notificationService.delete(notification.id);
-      this.notificationGateway.sendNotifications(notification);
+      this.notificationGateway.sendNotifications(followingId, notification);
 
       return {
         status: 'unfollow',

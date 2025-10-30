@@ -61,7 +61,9 @@ export class PostService {
     }
   > {
     const { message, userId } = createPostDto;
-    let notifications: (Notification & { sender: Omit<User, 'passwordHash'> })[];
+    let notifications: (Notification & {
+      sender: Omit<User, 'passwordHash'>;
+    })[];
     if (!message && (!files || !files.length)) {
       throw new BadRequestException('Post must contain a message or files');
     }
@@ -94,7 +96,12 @@ export class PostService {
           userId,
           post.id,
         );
-        this.notificationGateway.sendNotifications(notifications);
+        notifications.forEach((notification) => {
+          this.notificationGateway.sendNotifications(
+            notification.receiverId,
+            notification,
+          );
+        });
 
         return post;
       }
@@ -139,7 +146,12 @@ export class PostService {
           userId,
           post.id,
         );
-        this.notificationGateway.sendNotifications(notifications);
+        notifications.forEach((notification) => {
+          this.notificationGateway.sendNotifications(
+            notification.receiverId,
+            notification,
+          );
+        });
 
         return {
           ...post,
@@ -194,9 +206,13 @@ export class PostService {
           },
         },
       });
-      const notification = await createNotification(this.notificationService, userId, post);
-      if(notification){
-        this.notificationGateway.sendNotifications(notification);
+      const notification = await createNotification(
+        this.notificationService,
+        userId,
+        post,
+      );
+      if (notification) {
+        this.notificationGateway.sendNotifications(notification.receiverId, notification);
       }
 
       return sharePost;

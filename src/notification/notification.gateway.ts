@@ -1,6 +1,13 @@
-import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { JwtService } from '@nestjs/jwt';
+import {
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  WebSocketGateway,
+} from '@nestjs/websockets';
 import { Notification } from 'generated/prisma';
-import { Server } from 'socket.io';
+import { Socket } from 'socket.io';
+import { handleWsConnection } from 'src/utils/helpers/handle-ws-connection';
+import { handleWsDisconnection } from 'src/utils/helpers/handle-ws-disconnection';
 
 interface ServerToClientEvents {
   [event: `notification:${string}`]: (notifications: Notification) => void;
@@ -12,20 +19,44 @@ interface ServerToClientEvents {
     credentials: true,
   },
 })
-export class NotificationGateway {
-  @WebSocketServer()
-  private server: Server<any, ServerToClientEvents>;
+export class NotificationGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
+  constructor(private jwtService: JwtService) {}
 
-  sendNotifications(notifications: Notification | Notification[]) {
-    if (Array.isArray(notifications)) {
-      notifications.forEach((notification) => {
-        this.server.emit(
-          `notification:${notification.receiverId}`,
-          notification,
+  private clients = new Map<string, Socket<any, ServerToClientEvents>>();
+
+  handleConnection(client: Socket) {
+    handleWsConnection(
+      client,
+      this.jwtService,
+      this.clients,
+    );
+  }
+
+  handleDisconnect(client: Socket) {
+    handleWsDisconnection(client, this.clients);
+  }
+
+  sendNotifications(
+    userId: string,
+    notifications: Notification | Notification[],
+  ) {
+    const client = this.clients.get(userId);
+    if (client) {
+      if (Array.isArray(notifications)) {
+        notifications.forEach((notification) => {
+          client.broadcast.emit(
+            `notification:${notification.receiverId}`,
+            notification,
+          );
+        });
+      } else {
+        client.broadcast.emit(
+          `notification:${notifications.receiverId}`,
+          notifications,
         );
-      });
-    } else {
-      this.server.emit(`notification:${notifications.receiverId}`, notifications);
+      }
     }
   }
 }
