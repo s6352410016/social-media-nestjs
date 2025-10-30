@@ -98,7 +98,7 @@ export class PostService {
         );
         notifications.forEach((notification) => {
           this.notificationGateway.sendNotifications(
-            notification.receiverId,
+            createPostDto.userId,
             notification,
           );
         });
@@ -148,7 +148,7 @@ export class PostService {
         );
         notifications.forEach((notification) => {
           this.notificationGateway.sendNotifications(
-            notification.receiverId,
+            createPostDto.userId,
             notification,
           );
         });
@@ -212,7 +212,7 @@ export class PostService {
         post,
       );
       if (notification) {
-        this.notificationGateway.sendNotifications(notification.receiverId, notification);
+        this.notificationGateway.sendNotifications(createPostDto.userId, notification);
       }
 
       return sharePost;
