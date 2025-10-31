@@ -27,6 +27,7 @@ import { createNotifications } from 'src/utils/helpers/create-notifications';
 import { createNotification } from 'src/utils/helpers/create-notification';
 import { UserService } from 'src/user/user.service';
 import { NotificationGateway } from 'src/notification/notification.gateway';
+import { PostGateway } from './post.gateway';
 import { Express } from 'express';
 
 @Injectable()
@@ -40,6 +41,7 @@ export class PostService {
     private notificationService: NotificationService,
     private userService: UserService,
     private notificationGateway: NotificationGateway,
+    private postGateway: PostGateway,
   ) {
     this.s3 = new S3Client({
       region: configServiceParam.get<string>('AWS_BUCKET_REGION')!,
@@ -98,10 +100,11 @@ export class PostService {
         );
         notifications.forEach((notification) => {
           this.notificationGateway.sendNotifications(
-            createPostDto.userId,
+            userId,
             notification,
           );
         });
+        this.postGateway.broadcastNewPost(userId, post);
 
         return post;
       }
@@ -148,10 +151,11 @@ export class PostService {
         );
         notifications.forEach((notification) => {
           this.notificationGateway.sendNotifications(
-            createPostDto.userId,
+            userId,
             notification,
           );
         });
+        this.postGateway.broadcastNewPost(userId, post);
 
         return {
           ...post,
@@ -212,8 +216,9 @@ export class PostService {
         post,
       );
       if (notification) {
-        this.notificationGateway.sendNotifications(createPostDto.userId, notification);
+        this.notificationGateway.sendNotifications(userId, notification);
       }
+      this.postGateway.broadcastNewPost(userId, sharePost);
 
       return sharePost;
     } catch (error: unknown) {
