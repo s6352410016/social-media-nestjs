@@ -1,4 +1,4 @@
-import { DeleteObjectCommandOutput, S3Client } from '@aws-sdk/client-s3';
+import { S3Client } from '@aws-sdk/client-s3';
 import {
   BadRequestException,
   Injectable,
@@ -28,6 +28,7 @@ import { createNotification } from 'src/utils/helpers/create-notification';
 import { UserService } from 'src/user/user.service';
 import { NotificationGateway } from 'src/notification/notification.gateway';
 import { PostGateway } from './post.gateway';
+import { deleteFileFromS3 } from 'src/utils/helpers/delete-file-from-s3';
 import { Express } from 'express';
 
 @Injectable()
@@ -54,19 +55,59 @@ export class PostService {
     });
   }
 
-  async createPost(
-    createPostDto: CreatePostDto & { userId: string },
-    files: Express.Multer.File[],
-  ): Promise<
+  async createFiles(files: Express.Multer.File[]) {
+    try {
+      if (!files || !files.length) {
+        throw new BadRequestException('Files cannot be empty');
+      }
+
+      const newFilesName = genFilesName(files);
+      await Promise.all(
+        newFilesName.map((newFileName) => {
+          const fileDir = getFileDirFromFile(newFileName, 'post');
+          return putObjectS3(
+            newFileName,
+            this.configService.get<string>('AWS_BUCKET_NAME')!,
+            fileDir,
+            this.s3,
+          );
+        }),
+      );
+
+      const filesUrl = await Promise.all(
+        newFilesName.map((newFileName) => {
+          const fileDir = getFileDirFromFile(newFileName, 'post');
+          return getObjectS3(
+            newFileName.originalname,
+            this.configService.get<string>('AWS_BUCKET_NAME')!,
+            fileDir,
+            this.s3,
+          );
+        }),
+      );
+
+      return {
+        filesUrl,
+      };
+    } catch (error: unknown) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(error, 'Unexpected error');
+    }
+  }
+
+  async createPost(createPostDto: CreatePostDto & { userId: string }): Promise<
     Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
       filesUrl?: string[];
     }
   > {
-    const { message, userId } = createPostDto;
+    const { message, userId, filesUrl } = createPostDto;
     let notifications: (Notification & {
       sender: Omit<User, 'passwordHash'>;
     })[];
-    if (!message && (!files || !files.length)) {
+    if (!message && (!filesUrl || !filesUrl.length)) {
       throw new BadRequestException('Post must contain a message or files');
     }
 
@@ -91,7 +132,7 @@ export class PostService {
         },
       });
 
-      if (!files || !files.length) {
+      if (!filesUrl || !filesUrl.length) {
         notifications = await createNotifications(
           this.prismaService,
           this.notificationService,
@@ -99,42 +140,14 @@ export class PostService {
           post.id,
         );
         notifications.forEach((notification) => {
-          this.notificationGateway.sendNotifications(
-            userId,
-            notification,
-          );
+          this.notificationGateway.sendNotifications(userId, notification);
         });
         this.postGateway.broadcastNewPost(userId, post);
 
         return post;
       }
 
-      if (files && files.length) {
-        const newFilesName = genFilesName(files);
-        await Promise.all(
-          newFilesName.map((newFileName) => {
-            const fileDir = getFileDirFromFile(newFileName);
-            return putObjectS3(
-              newFileName,
-              this.configService.get<string>('AWS_BUCKET_NAME')!,
-              fileDir,
-              this.s3,
-            );
-          }),
-        );
-
-        const filesUrl = await Promise.all(
-          newFilesName.map((newFileName) => {
-            const fileDir = getFileDirFromFile(newFileName);
-            return getObjectS3(
-              newFileName.originalname,
-              this.configService.get<string>('AWS_BUCKET_NAME')!,
-              fileDir,
-              this.s3,
-            );
-          }),
-        );
-
+      if (filesUrl && filesUrl.length) {
         const postFileRecords = createFileRecords(
           filesUrl,
           post.id,
@@ -150,10 +163,7 @@ export class PostService {
           post.id,
         );
         notifications.forEach((notification) => {
-          this.notificationGateway.sendNotifications(
-            userId,
-            notification,
-          );
+          this.notificationGateway.sendNotifications(userId, notification);
         });
         this.postGateway.broadcastNewPost(userId, post);
 
@@ -232,13 +242,25 @@ export class PostService {
     }
   }
 
-  async findPosts(): Promise<
-    (Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+  async findPosts(
+    cursor?: string,
+    limit: number = 5,
+  ): Promise<{
+    posts: (Post & {
+      user: Omit<User, 'passwordHash'>;
+      likes: Like[];
       filesUrl: string[];
-    })[]
-  > {
+    })[];
+    nextCursor: string | null;
+  }> {
     try {
       const posts = await this.prismaService.post.findMany({
+        take: -(limit + 1),
+        cursor: cursor
+          ? {
+              id: cursor,
+            }
+          : undefined,
         include: {
           likes: true,
           user: {
@@ -246,6 +268,9 @@ export class PostService {
               passwordHash: true,
             },
           },
+        },
+        orderBy: {
+          createdAt: 'desc',
         },
       });
 
@@ -273,7 +298,17 @@ export class PostService {
         }),
       );
 
-      return postsWithFiles;
+      let nextCursor: string | null = null;
+
+      if (postsWithFiles.length > limit) {
+        const nextItem = postsWithFiles.shift();
+        nextCursor = nextItem!.id;
+      }
+
+      return {
+        posts: postsWithFiles,
+        nextCursor,
+      };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
@@ -284,7 +319,9 @@ export class PostService {
   }
 
   async findPostById(postId: string): Promise<
-    Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+    Post & {
+      user: Omit<User, 'passwordHash'>;
+      likes: Like[];
       filesUrl: string[];
     }
   > {
@@ -336,11 +373,18 @@ export class PostService {
     }
   }
 
-  async findPostByUser(userId: string): Promise<
-    (Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+  async findPostByUser(
+    userId: string,
+    cursor?: string,
+    limit: number = 5,
+  ): Promise<{
+    posts: (Post & {
+      user: Omit<User, 'passwordHash'>;
+      likes: Like[];
       filesUrl: string[];
-    })[]
-  > {
+    })[];
+    nextCursor: string | null;
+  }> {
     try {
       const user = await this.userService.findById(userId);
       if (!user) {
@@ -351,6 +395,12 @@ export class PostService {
         where: {
           userId,
         },
+        take: -(limit + 1),
+        cursor: cursor
+          ? {
+              id: cursor,
+            }
+          : undefined,
         include: {
           likes: true,
           user: {
@@ -358,6 +408,9 @@ export class PostService {
               passwordHash: true,
             },
           },
+        },
+        orderBy: {
+          createdAt: 'desc',
         },
       });
       if (!posts || !posts.length) {
@@ -387,7 +440,17 @@ export class PostService {
         }),
       );
 
-      return postsWithFiles;
+      let nextCursor: string | null = null;
+
+      if (postsWithFiles.length > limit) {
+        const nextItem = postsWithFiles.shift();
+        nextCursor = nextItem!.id;
+      }
+
+      return {
+        posts: postsWithFiles,
+        nextCursor,
+      };
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
@@ -399,16 +462,15 @@ export class PostService {
     }
   }
 
-  async updatePost(
-    updatePostDto: UpdatePostDto & { postId: string },
-    files?: Express.Multer.File[],
-  ): Promise<
-    Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
-      filesUrl?: string[];
+  async updatePost(updatePostDto: UpdatePostDto & { postId: string }): Promise<
+    Post & {
+      user: Omit<User, 'passwordHash'>;
+      likes: Like[];
+      filesUrl: string[];
     }
   > {
-    const { message, postId } = updatePostDto;
-    if (!message && (!files || !files.length)) {
+    const { message, postId, filesUrl } = updatePostDto;
+    if (!message && (!filesUrl || !filesUrl.length)) {
       throw new BadRequestException('Post must contain a message or files');
     }
 
@@ -439,7 +501,7 @@ export class PostService {
         },
       });
 
-      if (!files || !files.length) {
+      if (!filesUrl || !filesUrl.length) {
         const fileRecords = await this.prismaService.file.findMany({
           where: {
             contentId: post.id,
@@ -475,7 +537,7 @@ export class PostService {
         };
       }
 
-      if (files && files.length) {
+      if (filesUrl && filesUrl.length) {
         const postFiles = await findFiles(post.id, this.prismaService);
 
         if (postFiles && postFiles.length) {
@@ -495,24 +557,12 @@ export class PostService {
           );
         }
 
-        const newFilesName = genFilesName(files);
-        await Promise.all(
-          newFilesName.map((newFileName) => {
-            const fileDir = getFileDirFromFile(newFileName);
-            return putObjectS3(
-              newFileName,
-              this.configService.get<string>('AWS_BUCKET_NAME')!,
-              fileDir,
-              this.s3,
-            );
-          }),
-        );
-
-        const filesUrl = await Promise.all(
-          newFilesName.map((newFileName) => {
-            const fileDir = getFileDirFromFile(newFileName);
+        const filesUrlS3 = await Promise.all(
+          filesUrl.map((fileUrl) => {
+            const fileDir = getFileDirFromPresignedUrl(fileUrl) as FileDir;
+            const filename = getFileNameFromPresignedUrl(fileUrl);
             return getObjectS3(
-              newFileName.originalname,
+              filename,
               this.configService.get<string>('AWS_BUCKET_NAME')!,
               fileDir,
               this.s3,
@@ -533,7 +583,7 @@ export class PostService {
         );
 
         const createFileRecordsData = createFileRecords(
-          filesUrl,
+          filesUrlS3,
           post.id,
           ContentType.POST,
         );
@@ -543,7 +593,7 @@ export class PostService {
 
         return {
           ...post,
-          filesUrl,
+          filesUrl: filesUrlS3,
         };
       }
 
@@ -625,24 +675,6 @@ export class PostService {
         throw new NotFoundException(`File id ${fileId} not found`);
       }
 
-      function deleteFileFromS3(
-        configService: ConfigService,
-        s3: S3Client,
-      ): Promise<DeleteObjectCommandOutput> {
-        if (file) {
-          const fileName = getFileNameFromPresignedUrl(file.fileUrl);
-          const fileDir = getFileDirFromPresignedUrl(file.fileUrl) as FileDir;
-          return deleteObjectS3(
-            fileName,
-            configService.get<string>('AWS_BUCKET_NAME')!,
-            fileDir,
-            s3,
-          );
-        }
-
-        throw new BadRequestException('File is not empty');
-      }
-
       await Promise.all([
         this.prismaService.file.delete({
           where: {
@@ -650,14 +682,13 @@ export class PostService {
             contentType: ContentType.POST,
           },
         }),
-        deleteFileFromS3(this.configService, this.s3),
+        deleteFileFromS3(file, this.configService, this.s3),
       ]);
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
       } else if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
+        error instanceof NotFoundException
       ) {
         throw error;
       }

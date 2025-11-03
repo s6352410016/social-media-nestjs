@@ -2,11 +2,16 @@ import { FileDir } from "../types";
 
 export function getFileDirFromFile(
   file: Express.Multer.File,
+  type: 'post' | 'comment' | 'reply' | 'chat',
 ): FileDir {
-  return file.mimetype === 'image/png' ||
-    file.mimetype === 'image/jpg' ||
-    file.mimetype === 'image/jpeg' ||
-    file.mimetype === 'image/webp'
-    ? 'post-image'
-    : 'post-video';
+  switch(type){
+    case 'post':
+      return file.mimetype.startsWith('image') ? 'post-image' : 'post-video';
+    case 'comment':
+      return 'comment-image';
+    case 'reply':
+      return 'reply-image';
+    default: 
+      return file.mimetype.startsWith('image') ? 'chat-image' : 'chat-video';
+  }  
 }

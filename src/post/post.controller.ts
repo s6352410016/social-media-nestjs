@@ -4,9 +4,11 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -18,6 +20,7 @@ import {
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CommonResponse } from 'src/utils/swagger/common-response';
@@ -33,14 +36,13 @@ import { Express } from 'express';
 export class PostController {
   constructor(private postService: PostService) {}
 
-  @Post('create/:userId')
+  @Post('files/create')
   @UseInterceptors(FilesInterceptor('files', 10))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        message: { type: 'string' },
         files: {
           type: 'array',
           items: {
@@ -52,26 +54,38 @@ export class PostController {
     },
   })
   @ApiCreatedResponse({
+    description: 'Files created successfully',
+    type: CommonResponse,
+  })
+  async createFiles(
+    @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
+  ): Promise<ResponseFromService> {
+    const filesUrl = await this.postService.createFiles(files);
+
+    return {
+      message: 'Files created successfully',
+      data: filesUrl,
+    };
+  }
+
+  @Post('create/:userId')
+  @ApiCreatedResponse({
     description: 'Post created successfully',
     type: CommonResponse,
   })
   async createPost(
-    @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
     @Param('userId', ParseUUIDPipe) userId: string,
     @Body() createPostDto: CreatePostDto,
   ): Promise<ResponseFromService> {
-    const post = await this.postService.createPost(
-      {
-        ...createPostDto,
-        userId,
-      },
-      files,
-    );
+    const post = await this.postService.createPost({
+      ...createPostDto,
+      userId,
+    });
 
     return {
       message: 'Post created successfully',
       data: post,
-    }
+    };
   }
 
   @Post('share/create/:userId/:parentId')
@@ -93,10 +107,12 @@ export class PostController {
     return {
       message: 'Share post created successfully',
       data: sharePost,
-    }
+    };
   }
 
   @Get('find')
+  @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: String })
   @ApiNotFoundResponse({
     description: 'Not found',
     type: CommonResponse,
@@ -105,13 +121,16 @@ export class PostController {
     description: 'Post retrived succussfully',
     type: CommonResponse,
   })
-  async findPosts(): Promise<ResponseFromService> {
-    const posts = await this.postService.findPosts();
+  async findPosts(
+    @Query('cursor', new ParseUUIDPipe({ optional: true })) cursor?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ): Promise<ResponseFromService> {
+    const posts = await this.postService.findPosts(cursor, limit);
 
     return {
       message: 'Post retrived succussfully',
       data: posts,
-    }
+    };
   }
 
   @Get('find/:postId')
@@ -131,10 +150,12 @@ export class PostController {
     return {
       message: 'Post retrived succussfully',
       data: post,
-    }
+    };
   }
 
   @Get('find/user/:userId')
+  @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: String })
   @ApiNotFoundResponse({
     description: 'Not found',
     type: CommonResponse,
@@ -145,60 +166,39 @@ export class PostController {
   })
   async findPostByUser(
     @Param('userId', ParseUUIDPipe) userId: string,
+    @Query('cursor', new ParseUUIDPipe({ optional: true })) cursor?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ): Promise<ResponseFromService> {
-    const posts = await this.postService.findPostByUser(userId);
+    const posts = await this.postService.findPostByUser(userId, cursor, limit);
 
     return {
       message: 'Post retrived succussfully',
       data: posts,
-    }
+    };
   }
 
   @Patch('update/:postId')
-  @UseInterceptors(FilesInterceptor('files', 10))
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        message: {
-          type: 'string',
-        },
-        files: {
-          type: 'array',
-          items: {
-            type: 'string',
-            format: 'binary',
-          },
-        },
-      },
-    },
-  })
   @ApiNotFoundResponse({
     description: 'Not found',
     type: CommonResponse,
   })
-  @ApiCreatedResponse({
+  @ApiOkResponse({
     description: 'Post updated successfully',
     type: CommonResponse,
   })
   async updatePost(
-    @UploadedFiles(new FileTypeValidationPipe()) files: Express.Multer.File[],
     @Param('postId', ParseUUIDPipe) postId: string,
     @Body() updatePostDto: UpdatePostDto,
   ): Promise<ResponseFromService> {
-    const post = await this.postService.updatePost(
-      {
-        ...updatePostDto,
-        postId,
-      },
-      files,
-    );
+    const post = await this.postService.updatePost({
+      ...updatePostDto,
+      postId,
+    });
 
     return {
       message: 'Post updated successfully',
       data: post,
-    }
+    };
   }
 
   @Delete('delete/:postId')
@@ -217,7 +217,7 @@ export class PostController {
 
     return {
       message: 'Post deleted successfully',
-    }
+    };
   }
 
   @Delete('delete/file/:fileId')
@@ -233,9 +233,9 @@ export class PostController {
     @Param('fileId', ParseUUIDPipe) fileId: string,
   ): Promise<ResponseFromService> {
     await this.postService.deleteFile(fileId);
-    
+
     return {
       message: 'File deleted successfully',
-    }
+    };
   }
 }

@@ -28,7 +28,13 @@ export interface ICreateFileRecord {
   contentType: ContentType;
 }
 
-export type FileDir = 'post-image' | 'post-video';
+export type FileDir =
+  | 'post-image'
+  | 'post-video'
+  | 'comment-image'
+  | 'reply-image'
+  | 'chat-image'
+  | 'chat-video';
 
 export interface ResponseFromService {
   message: string;
