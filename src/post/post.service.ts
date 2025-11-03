@@ -99,7 +99,9 @@ export class PostService {
   }
 
   async createPost(createPostDto: CreatePostDto & { userId: string }): Promise<
-    Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] } & {
+    Post & {
+      user: Omit<User, 'passwordHash'>;
+      likes: Like[];
       filesUrl?: string[];
     }
   > {
@@ -187,7 +189,7 @@ export class PostService {
 
   async createSharePost(
     createPostDto: CreatePostDto & { userId: string; parentId: string },
-  ): Promise<Post & { user: Omit<User, 'passwordHash'> } & { likes: Like[] }> {
+  ): Promise<Post & { user: Omit<User, 'passwordHash'>; likes: Like[] }> {
     const { message, userId, parentId } = createPostDto;
 
     try {
@@ -687,9 +689,7 @@ export class PostService {
     } catch (error: unknown) {
       if (error instanceof PrismaClientKnownRequestError) {
         throw new InternalServerErrorException(error.message);
-      } else if (
-        error instanceof NotFoundException
-      ) {
+      } else if (error instanceof NotFoundException) {
         throw error;
       }
 
